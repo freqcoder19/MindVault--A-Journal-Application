@@ -1,0 +1,69 @@
+{
+  "entities": {
+    "Entry": {
+      "path": "/users/{userId}/entries/{entryId}",
+      "description": "User-isolated encrypted/plain journal entry",
+      "fields": {
+        "id": { "type": "string", "description": "Unique entry identifier" },
+        "userId": { "type": "string", "description": "Authenticated Owner UID" },
+        "title": { "type": "string", "description": "Entry title" },
+        "content": { "type": "string", "description": "Journal text body" },
+        "mood": { "type": "string", "description": "Mood rating or feeling label" },
+        "moodScore": { "type": "number", "description": "Numeric mood score 1-5" },
+        "tags": { "type": "array", "description": "Categorization tags" },
+        "isEncrypted": { "type": "boolean", "description": "Client vault encryption flag" },
+        "isLocked": { "type": "boolean", "description": "Private lock active" },
+        "aiReflection": { "type": "object", "description": "Gemini reflection response" },
+        "createdAt": { "type": "string", "description": "ISO timestamp" },
+        "updatedAt": { "type": "string", "description": "ISO timestamp" }
+      }
+    },
+    "Conversation": {
+      "path": "/users/{userId}/conversations/{conversationId}",
+      "description": "User-isolated AI mindfulness conversation thread",
+      "fields": {
+        "id": { "type": "string", "description": "Conversation ID" },
+        "userId": { "type": "string", "description": "Owner UID" },
+        "entryId": { "type": "string", "description": "Optional associated journal entry ID" },
+        "title": { "type": "string", "description": "Thread title" },
+        "createdAt": { "type": "string", "description": "ISO timestamp" },
+        "updatedAt": { "type": "string", "description": "ISO timestamp" }
+      }
+    },
+    "Message": {
+      "path": "/users/{userId}/conversations/{conversationId}/messages/{messageId}",
+      "description": "Individual conversational message in a mindfulness thread",
+      "fields": {
+        "id": { "type": "string", "description": "Message ID" },
+        "conversationId": { "type": "string", "description": "Parent conversation ID" },
+        "userId": { "type": "string", "description": "Owner UID" },
+        "role": { "type": "string", "description": "user or assistant" },
+        "content": { "type": "string", "description": "Message text" },
+        "timestamp": { "type": "string", "description": "ISO timestamp" }
+      }
+    },
+    "SecurityAuditLog": {
+      "path": "/users/{userId}/security_audit_logs/{logId}",
+      "description": "User-isolated audit log recording security and AI verification events",
+      "fields": {
+        "id": { "type": "string", "description": "Log identifier" },
+        "userId": { "type": "string", "description": "Owner UID" },
+        "action": { "type": "string", "description": "Action performed" },
+        "status": { "type": "string", "description": "Success or Failure status" },
+        "details": { "type": "string", "description": "Sanitized event details" },
+        "timestamp": { "type": "string", "description": "ISO timestamp" }
+      }
+    },
+    "UserSettings": {
+      "path": "/users/{userId}/settings/preferences",
+      "description": "User preferences and security configurations",
+      "fields": {
+        "userId": { "type": "string", "description": "Owner UID" },
+        "aiPersona": { "type": "string", "description": "Default Gemini reflection style" },
+        "lockPinHash": { "type": "string", "description": "Optional client-hashed vault pin" },
+        "autoSummarize": { "type": "boolean", "description": "Auto-generate AI reflections" },
+        "theme": { "type": "string", "description": "UI Theme preference" }
+      }
+    }
+  }
+}

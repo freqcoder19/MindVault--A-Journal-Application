@@ -1,0 +1,58 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Helper functions for security boundary enforcement
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    // Default deny all access across the entire database
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // User scope: All reads, writes, and subcollections are strictly bounded to the authenticated UID
+    match /users/{userId} {
+      // User Profile document
+      allow get, update, delete: if isOwner(userId);
+      allow create: if isOwner(userId);
+      allow list: if false; // Deny listing /users collection
+
+      // Journal entries subcollection: /users/{userId}/entries/{entryId}
+      match /entries/{entryId} {
+        allow read, write: if isOwner(userId);
+      }
+
+      // Mindfulness conversation threads: /users/{userId}/conversations/{conversationId}
+      match /conversations/{conversationId} {
+        allow read, write: if isOwner(userId);
+
+        // Individual messages: /users/{userId}/conversations/{conversationId}/messages/{messageId}
+        match /messages/{messageId} {
+          allow read, write: if isOwner(userId);
+        }
+      }
+
+      // Security audit logs: /users/{userId}/security_audit_logs/{logId}
+      match /security_audit_logs/{logId} {
+        allow read, write: if isOwner(userId);
+      }
+
+      // User settings & preferences: /users/{userId}/settings/{settingId}
+      match /settings/{settingId} {
+        allow read, write: if isOwner(userId);
+      }
+
+      // Recursive wildcard: Protects all existing and future nested subcollections under /users/{userId}
+      match /{allSubcollections=**} {
+        allow read, write: if isOwner(userId);
+      }
+    }
+  }
+}
+

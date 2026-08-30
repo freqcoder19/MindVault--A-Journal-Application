@@ -1,0 +1,6 @@
+{
+  "name": "MindVault: Personal Gemini Journal",
+  "description": "A security-first personal journal with authenticated Firebase isolation, trusted backend Gemini AI reflections, and encrypted client vaults.",
+  "requestFramePermissions": ["microphone"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
