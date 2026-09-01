@@ -66,6 +66,16 @@ export interface ConversationMessage {
   timestamp: string;
 }
 
+export interface JournalImage {
+  id: string;
+  name: string;
+  url: string;
+  storagePath: string;
+  size: number;
+  mimeType: string;
+  createdAt: string;
+}
+
 export interface JournalEntry {
   id: string;
   userId: string;
@@ -77,6 +87,7 @@ export interface JournalEntry {
   isEncrypted: boolean;
   isLocked?: boolean;
   encryptedPayload?: string; // Ciphertext if client zero-knowledge vault is enabled
+  images?: JournalImage[]; // Up to 2 private journal memory photos (Firebase Storage)
   aiReflection?: AIReflectionData | null;
   aiChatHistory?: AIChatMessage[];
   createdAt: string;
@@ -125,9 +136,87 @@ export interface IntrospectivePrompt {
 export interface SecurityStatusReport {
   authStatus: 'verified' | 'unauthenticated' | 'invalid_token';
   verifiedUid: string | null;
+  role?: 'user' | 'admin';
+  isAdmin?: boolean;
+  tokenVerificationEngine?: string;
+  appCheckEnforced?: boolean;
+  appCheckEngine?: string;
   backendIsolationEnforced: boolean;
-  secretManagerGuarded: boolean;
+  storageIsolationEnforced?: boolean;
+  secretManagerConfigured?: boolean;
+  secretManagerGuarded?: boolean;
   firestoreRulesEnforced: boolean;
   cloudProject: string;
   databaseId: string;
+}
+
+export interface ThoughtLoopPattern {
+  theme: string;
+  description: string;
+  frequency: string;
+  trend: 'Increasing' | 'Decreasing' | 'Stable' | 'Fluctuating';
+  relatedThemes: string[];
+  emotionalTrend: string;
+  reflectiveInsight: string;
+  reflectionQuestion: string;
+}
+
+export interface ThoughtLoopAnalysis {
+  recurringPatterns: ThoughtLoopPattern[];
+  overallSummary: string;
+  dominantEmotionalArc: string;
+  entriesAnalyzedCount: number;
+  insufficientData: boolean;
+  message?: string;
+  analyzedAt: string;
+}
+
+export interface AdminAggregateTheme {
+  theme: string;
+  aggregateOccurrences: number;
+}
+
+export interface AdminAggregateMetrics {
+  totalUserCount: number;
+  totalJournalEntryCount: number;
+  totalAIRequestCount: number;
+  authFailureCount: number;
+  appCheckFailureCount?: number;
+  rateLimitEventCount: number;
+  aiRequestsByType: {
+    reflection: number;
+    chat: number;
+    sentiment: number;
+    thoughtLoops: number;
+    prompts: number;
+    digest: number;
+  };
+  aggregateThoughtLoopThemes: AdminAggregateTheme[];
+  uptimeSeconds: number;
+  serverStartedAt: string;
+}
+
+export interface AdminSecurityPosture {
+  tokenVerificationEngine: string;
+  appCheckEngine?: string;
+  appCheckEnforced?: boolean;
+  backendIsolationEnforced: boolean;
+  secretManagerConfigured: boolean;
+  secretManagerDiagnostic: string;
+  geminiAuthEngine: string;
+  selectedModel: string;
+  vertexLocation: string;
+  rateLimiterActive: boolean;
+  firestoreRulesEnforced: boolean;
+  adminAccessType: string;
+  rawJournalAccessDisabled: boolean;
+}
+
+export interface AdminDashboardData {
+  success: boolean;
+  role: 'ADMIN';
+  privacyAssurance: string;
+  aggregateMetrics: AdminAggregateMetrics;
+  securityPosture: AdminSecurityPosture;
+  generatedAt: string;
 }

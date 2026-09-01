@@ -1,5 +1,5 @@
-import { getUserIdToken } from "./firebase";
-import { PersonaType, AIReflectionData, AIChatMessage, DigestReport, IntrospectivePrompt } from "../types";
+import { getUserIdToken, getAppCheckToken } from "./firebase";
+import { PersonaType, AIReflectionData, AIChatMessage, DigestReport, IntrospectivePrompt, ThoughtLoopAnalysis, AdminDashboardData } from "../types";
 
 export interface ReflectParams {
   content: string;
@@ -8,21 +8,46 @@ export interface ReflectParams {
   tags?: string[];
   persona?: PersonaType;
   promptIntent?: string;
+  entryId?: string;
 }
 
-// Request AI Reflection from trusted backend
+// Helper to construct authenticated + App Check attested headers
+async function buildSecureHeaders(includeAuth = true): Promise<Record<string, string>> {
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+  };
+
+  if (includeAuth) {
+    const token = await getUserIdToken();
+    if (token) {
+      headers["Authorization"] = `Bearer ${token}`;
+    }
+  }
+
+  // App Check attestation token (attests that request comes from authentic MindVault client)
+  try {
+    const appCheckToken = await getAppCheckToken();
+    if (appCheckToken) {
+      headers["X-Firebase-AppCheck"] = appCheckToken;
+    }
+  } catch (err) {
+    console.warn("[AppCheck] Token retrieval notice:", err);
+  }
+
+  return headers;
+}
+
+// Request AI Reflection from trusted backend (/api/reflect or /api/gemini/reflect)
 export async function requestAIReflection(params: ReflectParams): Promise<AIReflectionData> {
   const token = await getUserIdToken();
   if (!token) {
     throw new Error("Authentication required: Please sign in to request Gemini reflections.");
   }
 
-  const response = await fetch("/api/gemini/reflect", {
+  const headers = await buildSecureHeaders(true);
+  const response = await fetch("/api/reflect", {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "Authorization": `Bearer ${token}`,
-    },
+    headers,
     body: JSON.stringify(params),
   });
 
@@ -39,23 +64,29 @@ export async function requestAIReflection(params: ReflectParams): Promise<AIRefl
   };
 }
 
-// Interactive chat dialog on entry
-export async function sendEntryDialog(entryContent: string, messages: AIChatMessage[], currentMessage: string): Promise<string> {
+// Interactive chat dialog on entry (/api/chat or /api/gemini/dialog)
+export async function sendEntryDialog(
+  entryContent: string, 
+  messages: AIChatMessage[], 
+  currentMessage: string,
+  conversationId?: string,
+  entryId?: string
+): Promise<string> {
   const token = await getUserIdToken();
   if (!token) {
     throw new Error("Authentication required.");
   }
 
-  const response = await fetch("/api/gemini/dialog", {
+  const headers = await buildSecureHeaders(true);
+  const response = await fetch("/api/chat", {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "Authorization": `Bearer ${token}`,
-    },
+    headers,
     body: JSON.stringify({
       entryContent,
       messages,
       currentMessage,
+      conversationId,
+      entryId,
     }),
   });
 
@@ -75,12 +106,10 @@ export async function generateWeeklyDigest(entries: any[], timeframe: string = "
     throw new Error("Authentication required.");
   }
 
-  const response = await fetch("/api/gemini/digest", {
+  const headers = await buildSecureHeaders(true);
+  const response = await fetch("/api/digest", {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "Authorization": `Bearer ${token}`,
-    },
+    headers,
     body: JSON.stringify({ entries, timeframe }),
   });
 
@@ -104,12 +133,10 @@ export async function fetchPersonalizedPrompts(recentMoods: string[], preferredF
     throw new Error("Authentication required.");
   }
 
-  const response = await fetch("/api/gemini/prompts", {
+  const headers = await buildSecureHeaders(true);
+  const response = await fetch("/api/prompts", {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "Authorization": `Bearer ${token}`,
-    },
+    headers,
     body: JSON.stringify({ recentMoods, preferredFocus }),
   });
 
@@ -122,10 +149,63 @@ export async function fetchPersonalizedPrompts(recentMoods: string[], preferredF
   return data.prompts || [];
 }
 
+// Request Sentiment Analysis
+export async function requestSentimentAnalysis(text: string): Promise<any> {
+  const token = await getUserIdToken();
+  if (!token) {
+    throw new Error("Authentication required.");
+  }
+
+  const headers = await buildSecureHeaders(true);
+  const response = await fetch("/api/sentiment", {
+    method: "POST",
+    headers,
+    body: JSON.stringify({ text }),
+  });
+
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({ error: "Sentiment error" }));
+    throw new Error(err.error || "Failed to analyze sentiment");
+  }
+
+  const data = await response.json();
+  return data.sentiment;
+}
+
+// Fetch Thought Loop Detector analysis across user's private journal history
+export async function fetchThoughtLoops(): Promise<ThoughtLoopAnalysis> {
+  const token = await getUserIdToken();
+  if (!token) {
+    throw new Error("Authentication required: Please sign in to analyze your thought patterns.");
+  }
+
+  const headers = await buildSecureHeaders(true);
+  const response = await fetch("/api/thought-loops", {
+    method: "POST",
+    headers,
+  });
+
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({ error: "Network error" }));
+    throw new Error(err.error || `Failed to analyze thought loops (${response.status})`);
+  }
+
+  const data = await response.json();
+  return {
+    recurringPatterns: data.recurringPatterns || [],
+    overallSummary: data.overallSummary || "",
+    dominantEmotionalArc: data.dominantEmotionalArc || "",
+    entriesAnalyzedCount: data.entriesAnalyzedCount || 0,
+    insufficientData: Boolean(data.insufficientData),
+    message: data.message,
+    analyzedAt: data.analyzedAt || new Date().toISOString(),
+  };
+}
+
 // Fetch backend security status
 export async function fetchSecurityStatus(): Promise<any> {
+  const headers = await buildSecureHeaders(false);
   const token = await getUserIdToken();
-  const headers: Record<string, string> = {};
   if (token) {
     headers["Authorization"] = `Bearer ${token}`;
   }
@@ -134,3 +214,36 @@ export async function fetchSecurityStatus(): Promise<any> {
   if (!response.ok) throw new Error("Failed to query security status");
   return response.json();
 }
+
+// Fetch Admin Aggregate Dashboard (Protected: Verified ADMIN role + App Check required)
+export async function fetchAdminDashboard(): Promise<AdminDashboardData> {
+  const token = await getUserIdToken();
+  if (!token) {
+    throw new Error("Authentication required: Please sign in with an administrative account.");
+  }
+
+  const headers = await buildSecureHeaders(true);
+  const response = await fetch("/api/admin/dashboard", {
+    method: "GET",
+    headers,
+  });
+
+  if (response.status === 403) {
+    const err = await response.json().catch(() => ({ error: "Forbidden" }));
+    throw new Error(err.error || "Access Denied: Administrative privileges required. Non-admin users cannot access system telemetry.");
+  }
+
+  if (response.status === 401) {
+    const err = await response.json().catch(() => ({ error: "Unauthorized" }));
+    throw new Error(err.error || "Authentication required: Invalid or expired token / App Check failure.");
+  }
+
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({ error: "Network error" }));
+    throw new Error(err.error || `Failed to fetch admin dashboard (${response.status})`);
+  }
+
+  return response.json();
+}
+
+

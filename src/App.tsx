@@ -22,7 +22,9 @@ import { EntryCard } from './components/EntryCard';
 import { AIReflectionCard } from './components/AIReflectionCard';
 import { InsightsDashboard } from './components/InsightsDashboard';
 import { GuidedPromptsView } from './components/GuidedPromptsView';
+import { ThoughtLoopDetectorView } from './components/ThoughtLoopDetectorView';
 import { SecurityConstitutionModal } from './components/SecurityConstitutionModal';
+import { AdminDashboardView } from './components/AdminDashboardView';
 import { AuthModal } from './components/AuthModal';
 import { PasskeyModal } from './components/PasskeyModal';
 import { fetchSecurityStatus } from './lib/geminiApi';
@@ -37,7 +39,8 @@ import {
   Unlock, 
   KeyRound, 
   AlertCircle,
-  FolderLock
+  FolderLock,
+  Repeat
 } from 'lucide-react';
 
 export default function App() {
@@ -47,7 +50,7 @@ export default function App() {
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
 
   // Active View Tab
-  const [activeTab, setActiveTab] = useState<'journal' | 'reflections' | 'insights' | 'prompts' | 'security'>('journal');
+  const [activeTab, setActiveTab] = useState<'journal' | 'reflections' | 'loops' | 'insights' | 'prompts' | 'security' | 'admin'>('journal');
 
   // Journal & Audit State
   const [entries, setEntries] = useState<JournalEntry[]>([]);
@@ -449,7 +452,17 @@ export default function App() {
           </div>
         )}
 
-        {/* TAB 3: INSIGHTS & ANALYTICS */}
+        {/* TAB 3: THOUGHT LOOP DETECTOR (ORIGINAL FEATURE) */}
+        {activeTab === 'loops' && (
+          <ThoughtLoopDetectorView
+            entries={entries}
+            onSelectPrompt={handleSelectPrompt}
+            onGoToJournal={() => setActiveTab('journal')}
+            userId={currentUser?.uid}
+          />
+        )}
+
+        {/* TAB 4: INSIGHTS & ANALYTICS */}
         {activeTab === 'insights' && (
           <InsightsDashboard entries={entries} />
         )}
@@ -472,6 +485,14 @@ export default function App() {
               setEntries([]);
               setAuditLogs([]);
             }}
+          />
+        )}
+
+        {/* TAB 6: ADMIN & RBAC DASHBOARD */}
+        {activeTab === 'admin' && (
+          <AdminDashboardView
+            currentUserEmail={currentUser?.email || undefined}
+            onGoToJournal={() => setActiveTab('journal')}
           />
         )}
 

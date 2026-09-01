@@ -11,15 +11,16 @@ import {
   LogOut, 
   User as UserIcon,
   CheckCircle2,
-  KeyRound
+  KeyRound,
+  Repeat
 } from 'lucide-react';
 import { User } from '../lib/firebase';
 import { SecurityStatusReport } from '../types';
 
 interface NavigationHeaderProps {
   currentUser: User | null;
-  activeTab: 'journal' | 'reflections' | 'insights' | 'prompts' | 'security';
-  onTabChange: (tab: 'journal' | 'reflections' | 'insights' | 'prompts' | 'security') => void;
+  activeTab: 'journal' | 'reflections' | 'loops' | 'insights' | 'prompts' | 'security' | 'admin';
+  onTabChange: (tab: 'journal' | 'reflections' | 'loops' | 'insights' | 'prompts' | 'security' | 'admin') => void;
   onOpenAuth: () => void;
   onSignOut: () => void;
   isVaultLocked: boolean;
@@ -118,6 +119,19 @@ export const NavigationHeader: React.FC<NavigationHeaderProps> = ({
           </button>
 
           <button
+            id="nav-tab-loops"
+            onClick={() => onTabChange('loops')}
+            className={`flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-medium transition-all whitespace-nowrap ${
+              activeTab === 'loops'
+                ? 'bg-[#1a1a1a] text-[#f27d26] border border-[#f27d26]/40 shadow-sm font-semibold'
+                : 'text-[#737373] hover:text-[#d4d4d4] hover:bg-[#1a1a1a]/50'
+            }`}
+          >
+            <Repeat className="w-3.5 h-3.5 text-[#f27d26]" />
+            <span>Thought Loops</span>
+          </button>
+
+          <button
             id="nav-tab-insights"
             onClick={() => onTabChange('insights')}
             className={`flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-medium transition-all whitespace-nowrap ${
@@ -154,6 +168,19 @@ export const NavigationHeader: React.FC<NavigationHeaderProps> = ({
           >
             <div className="w-2 h-2 rounded-full bg-emerald-500"></div>
             <span>Security Constitution</span>
+          </button>
+
+          <button
+            id="nav-tab-admin"
+            onClick={() => onTabChange('admin')}
+            className={`flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-medium transition-all whitespace-nowrap ${
+              activeTab === 'admin'
+                ? 'bg-[#1a1a1a] text-purple-300 border border-purple-500/50 shadow-sm font-semibold'
+                : 'text-[#737373] hover:text-purple-300 hover:bg-[#1a1a1a]/50'
+            }`}
+          >
+            <ShieldCheck className="w-3.5 h-3.5 text-purple-400" />
+            <span>Admin Telemetry</span>
           </button>
         </nav>
 

@@ -11,10 +11,17 @@ import {
   signInAnonymously
 } from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
+import { 
+  initializeAppCheck, 
+  ReCaptchaEnterpriseProvider, 
+  CustomProvider, 
+  getToken, 
+  AppCheck 
+} from "firebase/app-check";
 import firebaseConfigJson from "../../firebase-applet-config.json";
 
 // Initialize Firebase SDK
-const app = !getApps().length ? initializeApp(firebaseConfigJson) : getApp();
+export const app = !getApps().length ? initializeApp(firebaseConfigJson) : getApp();
 
 // Target designated Firestore database ID
 export const db = firebaseConfigJson.firestoreDatabaseId
@@ -24,6 +31,70 @@ export const db = firebaseConfigJson.firestoreDatabaseId
 export const auth = getAuth(app);
 export const googleProvider = new GoogleAuthProvider();
 googleProvider.setCustomParameters({ prompt: 'select_account' });
+
+// =========================================================================
+// FIREBASE APP CHECK INITIALIZATION (Client-Side Attestation)
+// Attests that incoming requests originate from the authentic MindVault web client.
+// Works alongside (never replacing) Firebase Authentication.
+// =========================================================================
+let appCheckInstance: AppCheck | null = null;
+
+if (typeof window !== "undefined") {
+  try {
+    const metaEnv = ((import.meta as unknown) as { env?: Record<string, string> }).env || {};
+    const recaptchaSiteKey = (
+      (metaEnv.VITE_RECAPTCHA_SITE_KEY as string) ||
+      (firebaseConfigJson as any).recaptchaSiteKey ||
+      ""
+    ).trim();
+
+    // Enable App Check debug token in development or test mode if configured
+    if (metaEnv.DEV || metaEnv.VITE_APPCHECK_DEBUG_TOKEN) {
+      const debugToken = metaEnv.VITE_APPCHECK_DEBUG_TOKEN || true;
+      (self as any).FIREBASE_APPCHECK_DEBUG_TOKEN = debugToken;
+    }
+
+    if (recaptchaSiteKey) {
+      appCheckInstance = initializeAppCheck(app, {
+        provider: new ReCaptchaEnterpriseProvider(recaptchaSiteKey),
+        isTokenAutoRefreshEnabled: true,
+      });
+      console.log("[Security] App Check initialized with ReCaptchaEnterpriseProvider.");
+    } else {
+      // In development / sandboxed environments where reCAPTCHA site key is not provisioned,
+      // provide local attestation token provider to support local verification seamlessly.
+      appCheckInstance = initializeAppCheck(app, {
+        provider: new CustomProvider({
+          getToken: async () => {
+            const localToken = (metaEnv.VITE_APPCHECK_DEBUG_TOKEN as string) || "mindvault-local-dev-appcheck-token";
+            return {
+              token: localToken,
+              expireTimeMillis: Date.now() + 60 * 60 * 1000,
+            };
+          }
+        }),
+        isTokenAutoRefreshEnabled: true,
+      });
+      console.log("[Security] App Check initialized with custom attestation provider.");
+    }
+  } catch (err: any) {
+    console.warn("[Security] App Check client setup notice:", err.message);
+  }
+}
+
+export { appCheckInstance };
+
+// Helper to retrieve fresh App Check token for backend verification
+export async function getAppCheckToken(forceRefresh = false): Promise<string | null> {
+  if (!appCheckInstance) return null;
+  try {
+    const tokenResult = await getToken(appCheckInstance, forceRefresh);
+    return tokenResult.token || null;
+  } catch (err: any) {
+    console.warn("[Security] App Check token acquisition notice:", err.message);
+    return null;
+  }
+}
 
 export {
   signInWithPopup,
@@ -46,3 +117,4 @@ export async function getUserIdToken(): Promise<string | null> {
     return null;
   }
 }
+
