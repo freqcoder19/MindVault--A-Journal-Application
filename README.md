@@ -157,22 +157,9 @@ Vertex AI
 - **Auth:** Firebase Authentication with server-side ID token verification
 - **Data:** Firestore and Firebase Storage, both UID-isolated
 
-### App Check
-
-App Check is **optional**. The app does not require any of the following to function:
-
-```
-VITE_RECAPTCHA_SITE_KEY
-VITE_APPCHECK_DEBUG_TOKENS
-MINDVAULT_APPCHECK_ENFORCEMENT
-APPCHECK_DEBUG_TOKENS
-```
-
-Its absence never weakens Firebase Authentication, ID-token verification, Firestore/Storage isolation, backend authorization, rate limiting, Vertex AI security, or Secret Manager usage.
-
 ## Tech Stack
 
-- **Frontend:** Web client (Firebase-integrated)
+- **Frontend:** Web client (Firebase-integrated),react
 - **Backend:** Server-side token verification and business logic
 - **Database:** Firestore (per-user isolation)
 - **Storage:** Firebase Storage (per-user isolation)
@@ -202,9 +189,7 @@ MindVault should feel like a **premium personal journal** — calm, private, war
 
 The app should make users feel *"this is my private space,"* not *"I'm using an enterprise monitoring system."*
 
-## Cost / AI Usage Principles
 
-MindVault avoids unnecessary Gemini calls. Gemini is **not** automatically invoked when:
 
 - Saving a journal entry
 - Uploading an image
@@ -214,20 +199,5 @@ MindVault avoids unnecessary Gemini calls. Gemini is **not** automatically invok
 
 Gemini runs only on explicit user intent — starting a Gemini conversation, choosing "Reflect with Gemini," or requesting "Reflect on this month." Monthly summaries are cached after generation to avoid redundant calls.
 
-## What This Project Is Not
 
-MindVault is deliberately **not**:
-
-- Another generic AI chatbot
-- Another basic CRUD journal app
-- A productivity/task-management dashboard (that's not what Goals is for)
-- A project-management tool
-- A complicated AI control panel
-- An analytics-heavy admin dashboard
-
-Removed/rejected feature patterns that should not return:
-- Standalone "Explore Recurring Patterns" page or button
-- "Discuss" button on journal entries
-- "Unlocked status" UI
-- Standalone "Throughput Detector," "Thought Loop," "Recurring Patterns," or "AI Reflections" pages
 
