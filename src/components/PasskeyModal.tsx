@@ -48,25 +48,25 @@ export const PasskeyModal: React.FC<PasskeyModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#0a0a0a]/85 backdrop-blur-md animate-fade-in">
-      <div className="relative w-full max-w-md bg-[#121212] border border-[#262626] rounded-3xl p-6 md:p-7 shadow-2xl overflow-hidden">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-xs animate-fade-in">
+      <div className="relative w-full max-w-md bg-surface-card border border-theme rounded-2xl p-6 md:p-7 shadow-xl overflow-hidden">
         
         <button
           id="passkey-close-btn"
           onClick={onClose}
-          className="absolute top-4 right-4 p-2 rounded-xl text-[#737373] hover:text-white hover:bg-[#1a1a1a] transition-colors cursor-pointer"
+          className="absolute top-4 right-4 p-2 rounded-xl text-theme-muted hover:text-theme-primary hover:bg-surface-secondary transition-colors cursor-pointer"
         >
           <X className="w-5 h-5" />
         </button>
 
         <div className="text-center mb-6">
-          <div className="w-12 h-12 mx-auto mb-3 rounded-2xl bg-[#1a1a1a] border border-[#333333] flex items-center justify-center text-[#f27d26]">
+          <div className="w-12 h-12 mx-auto mb-3 rounded-2xl bg-accent/15 border border-accent/30 flex items-center justify-center text-accent">
             <Lock className="w-6 h-6" />
           </div>
-          <h3 className="font-display font-bold text-lg text-white">
+          <h3 className="font-display font-bold text-lg text-theme-primary">
             {hasStoredHash ? 'Unlock Private Vault' : 'Configure Zero-Knowledge Passkey'}
           </h3>
-          <p className="text-xs text-[#737373] font-serif-body mt-1">
+          <p className="text-xs text-theme-muted font-serif-body mt-1">
             {hasStoredHash 
               ? 'Enter your private passkey to decrypt sensitive AES-GCM entries locally.' 
               : 'Create a local passphrase for zero-knowledge client-side encryption.'}
@@ -74,7 +74,7 @@ export const PasskeyModal: React.FC<PasskeyModalProps> = ({
         </div>
 
         {errorMsg && (
-          <div className="mb-4 p-3.5 rounded-xl bg-rose-950/40 border border-rose-800/60 text-rose-300 text-xs flex items-center gap-2">
+          <div className="mb-4 p-3.5 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-600 dark:text-rose-400 text-xs flex items-center gap-2">
             <AlertCircle className="w-4 h-4 shrink-0" />
             <span>{errorMsg}</span>
           </div>
@@ -82,11 +82,11 @@ export const PasskeyModal: React.FC<PasskeyModalProps> = ({
 
         <form onSubmit={handleSetPasskey} className="space-y-4">
           <div>
-            <label className="block text-xs font-medium text-[#a3a3a3] mb-1">
+            <label className="block text-xs font-medium text-theme-secondary mb-1">
               Vault Passkey / PIN
             </label>
             <div className="relative">
-              <KeyRound className="w-4 h-4 absolute left-3.5 top-3 text-[#737373]" />
+              <KeyRound className="w-4 h-4 absolute left-3.5 top-3 text-theme-muted" />
               <input
                 id="vault-passkey-input"
                 type="password"
@@ -95,18 +95,18 @@ export const PasskeyModal: React.FC<PasskeyModalProps> = ({
                 value={passkey}
                 onChange={(e) => setPasskey(e.target.value)}
                 placeholder="Enter 6+ character passkey..."
-                className="w-full bg-[#0a0a0a] border border-[#262626] rounded-xl pl-10 pr-4 py-2.5 text-sm text-white placeholder-[#525252] focus:outline-none focus:border-[#f27d26]"
+                className="w-full bg-surface-secondary border border-theme rounded-xl pl-10 pr-4 py-2.5 text-sm text-theme-primary placeholder:text-theme-muted focus:outline-none focus:border-accent"
               />
             </div>
           </div>
 
           {!hasStoredHash && (
             <div>
-              <label className="block text-xs font-medium text-[#a3a3a3] mb-1">
+              <label className="block text-xs font-medium text-theme-secondary mb-1">
                 Confirm Passkey
               </label>
               <div className="relative">
-                <KeyRound className="w-4 h-4 absolute left-3.5 top-3 text-[#737373]" />
+                <KeyRound className="w-4 h-4 absolute left-3.5 top-3 text-theme-muted" />
                 <input
                   id="vault-confirm-passkey-input"
                   type="password"
@@ -114,17 +114,17 @@ export const PasskeyModal: React.FC<PasskeyModalProps> = ({
                   value={confirmPasskey}
                   onChange={(e) => setConfirmPasskey(e.target.value)}
                   placeholder="Repeat passkey..."
-                  className="w-full bg-[#0a0a0a] border border-[#262626] rounded-xl pl-10 pr-4 py-2.5 text-sm text-white placeholder-[#525252] focus:outline-none focus:border-[#f27d26]"
+                  className="w-full bg-surface-secondary border border-theme rounded-xl pl-10 pr-4 py-2.5 text-sm text-theme-primary placeholder:text-theme-muted focus:outline-none focus:border-accent"
                 />
               </div>
             </div>
           )}
 
-          <div className="p-3.5 rounded-2xl bg-[#0a0a0a] border border-[#262626] text-[11px] text-[#a3a3a3] space-y-1">
-            <p className="font-semibold text-white flex items-center gap-1.5">
-              <ShieldAlert className="w-3.5 h-3.5 text-[#f27d26]" /> Zero-Knowledge Guarantee:
+          <div className="p-3.5 rounded-xl bg-surface-secondary border border-theme text-[11px] text-theme-secondary space-y-1">
+            <p className="font-semibold text-theme-primary flex items-center gap-1.5">
+              <ShieldAlert className="w-3.5 h-3.5 text-accent" /> Zero-Knowledge Guarantee:
             </p>
-            <p className="leading-relaxed font-serif-body">
+            <p className="leading-relaxed font-serif-body text-theme-muted">
               Your passkey is NEVER sent to Google servers or stored in plaintext. If lost, encrypted entries cannot be recovered by any administrator.
             </p>
           </div>
@@ -132,7 +132,7 @@ export const PasskeyModal: React.FC<PasskeyModalProps> = ({
           <button
             id="vault-passkey-submit-btn"
             type="submit"
-            className="w-full py-3 px-4 rounded-xl bg-[#f27d26] hover:bg-[#e06b16] text-[#0a0a0a] font-semibold text-xs shadow-md transition-all cursor-pointer"
+            className="w-full py-3 px-4 rounded-xl bg-accent hover:opacity-90 text-white font-semibold text-xs shadow-xs transition-opacity cursor-pointer"
           >
             {hasStoredHash ? 'Unlock Vault' : 'Activate Passkey Protection'}
           </button>

@@ -207,29 +207,16 @@ export const GeminiCompanionView: React.FC<GeminiCompanionViewProps> = ({
               </span>
             </div>
             <p className="text-[11px] text-theme-muted font-serif-body">
-              Reflects with you naturally using your private journal context.
+              Talk freely with Gemini. Reflects with you naturally using your private journal context.
             </p>
           </div>
         </div>
 
         <div className="flex items-center gap-2">
-          {showPatternSuggestion && (
-            <button
-              id="gemini-explore-pattern-btn"
-              onClick={handleExplorePatterns}
-              disabled={isAnalyzingPatterns}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-surface-secondary hover:bg-surface-card border border-theme hover:border-accent text-xs text-theme-secondary hover:text-accent font-medium transition-all shadow-xs"
-              title="Look for recurring themes across your recent journal entries"
-            >
-              <Repeat className={`w-3.5 h-3.5 text-accent ${isAnalyzingPatterns ? 'animate-spin' : ''}`} />
-              <span>{isAnalyzingPatterns ? 'Exploring patterns...' : 'Explore recurring patterns'}</span>
-            </button>
-          )}
-
           <button
             id="gemini-clear-chat-btn"
             onClick={handleClearConversation}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-surface-secondary hover:bg-surface-card border border-theme text-xs text-theme-muted hover:text-theme-primary transition-colors"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-surface-secondary hover:bg-surface-card border border-theme text-xs text-theme-muted hover:text-theme-primary transition-colors cursor-pointer shadow-xs"
             title="Clear current dialogue and start fresh"
           >
             <RotateCcw className="w-3.5 h-3.5" />

@@ -1,16 +1,16 @@
 import { MoodMeta, PersonaMeta, IntrospectivePrompt } from "../types";
 
 export const MOOD_PRESETS: MoodMeta[] = [
-  { type: 'ecstatic', label: 'Ecstatic / Radiant', score: 5, color: 'text-[#f27d26]', bgColor: 'bg-[#1a1a1a] border-[#333333]', emoji: '✨' },
-  { type: 'grateful', label: 'Deeply Grateful', score: 5, color: 'text-emerald-400', bgColor: 'bg-[#1a1a1a] border-[#333333]', emoji: '🌿' },
-  { type: 'calm', label: 'Serene / Centered', score: 4, color: 'text-teal-400', bgColor: 'bg-[#1a1a1a] border-[#333333]', emoji: '🌊' },
-  { type: 'focused', label: 'Flow & Clarity', score: 4, color: 'text-sky-400', bgColor: 'bg-[#1a1a1a] border-[#333333]', emoji: '🎯' },
-  { type: 'reflective', label: 'Pensive / Introspective', score: 3, color: 'text-[#f27d26]', bgColor: 'bg-[#1a1a1a] border-[#333333]', emoji: '🌙' },
-  { type: 'hopeful', label: 'Hopeful & Yearning', score: 4, color: 'text-violet-400', bgColor: 'bg-[#1a1a1a] border-[#333333]', emoji: '🌱' },
-  { type: 'anxious', label: 'Anxious / Restless', score: 2, color: 'text-amber-400', bgColor: 'bg-[#1a1a1a] border-[#333333]', emoji: '⚡' },
-  { type: 'frustrated', label: 'Blocked / Frustrated', score: 2, color: 'text-rose-400', bgColor: 'bg-[#1a1a1a] border-[#333333]', emoji: '🔥' },
-  { type: 'exhausted', label: 'Fatigued / Burnout', score: 1, color: 'text-[#737373]', bgColor: 'bg-[#1a1a1a] border-[#333333]', emoji: '🍂' },
-  { type: 'grieving', label: 'Vulnerable / Heavy', score: 1, color: 'text-purple-400', bgColor: 'bg-[#1a1a1a] border-[#333333]', emoji: '🌧️' },
+  { type: 'ecstatic', label: 'Ecstatic / Radiant', score: 5, color: 'text-teal-400', bgColor: 'bg-surface-secondary border-theme', emoji: '✨' },
+  { type: 'grateful', label: 'Deeply Grateful', score: 5, color: 'text-emerald-400', bgColor: 'bg-surface-secondary border-theme', emoji: '🌿' },
+  { type: 'calm', label: 'Serene / Centered', score: 4, color: 'text-teal-500', bgColor: 'bg-surface-secondary border-theme', emoji: '🌊' },
+  { type: 'focused', label: 'Flow & Clarity', score: 4, color: 'text-sky-400', bgColor: 'bg-surface-secondary border-theme', emoji: '🎯' },
+  { type: 'reflective', label: 'Pensive / Introspective', score: 3, color: 'text-indigo-400', bgColor: 'bg-surface-secondary border-theme', emoji: '🌙' },
+  { type: 'hopeful', label: 'Hopeful & Yearning', score: 4, color: 'text-violet-400', bgColor: 'bg-surface-secondary border-theme', emoji: '🌱' },
+  { type: 'anxious', label: 'Anxious / Restless', score: 2, color: 'text-amber-400', bgColor: 'bg-surface-secondary border-theme', emoji: '⚡' },
+  { type: 'frustrated', label: 'Blocked / Frustrated', score: 2, color: 'text-rose-400', bgColor: 'bg-surface-secondary border-theme', emoji: '🔥' },
+  { type: 'exhausted', label: 'Fatigued / Burnout', score: 1, color: 'text-slate-400', bgColor: 'bg-surface-secondary border-theme', emoji: '🍂' },
+  { type: 'grieving', label: 'Vulnerable / Heavy', score: 1, color: 'text-purple-400', bgColor: 'bg-surface-secondary border-theme', emoji: '🌧️' },
 ];
 
 export const PERSONA_PRESETS: PersonaMeta[] = [
@@ -20,7 +20,7 @@ export const PERSONA_PRESETS: PersonaMeta[] = [
     subtitle: 'Warm Validation & Presence',
     description: 'Provides gentle, heartfelt psychological safety, holding space for whatever emotions arise.',
     iconName: 'HeartHandshake',
-    badgeColor: 'text-emerald-400 bg-[#1a1a1a] border-[#333333]',
+    badgeColor: 'text-emerald-500 bg-surface-secondary border-theme',
   },
   {
     id: 'socratic',
@@ -28,7 +28,7 @@ export const PERSONA_PRESETS: PersonaMeta[] = [
     subtitle: 'Deep Inquiry & Unpacking',
     description: 'Asks clarifying, non-judgmental questions to help you uncover underlying beliefs and patterns.',
     iconName: 'HelpCircle',
-    badgeColor: 'text-[#f27d26] bg-[#1a1a1a] border-[#333333]',
+    badgeColor: 'text-teal-400 bg-surface-secondary border-theme',
   },
   {
     id: 'cbt',
@@ -36,7 +36,7 @@ export const PERSONA_PRESETS: PersonaMeta[] = [
     subtitle: 'Cognitive Reframing',
     description: 'Identifies cognitive distortions (all-or-nothing, catastrophizing) and offers grounded reframes.',
     iconName: 'BrainCircuit',
-    badgeColor: 'text-cyan-400 bg-[#1a1a1a] border-[#333333]',
+    badgeColor: 'text-cyan-400 bg-surface-secondary border-theme',
   },
   {
     id: 'stoic',
@@ -44,7 +44,7 @@ export const PERSONA_PRESETS: PersonaMeta[] = [
     subtitle: 'Dichotomy of Control',
     description: 'Rooted in Marcus Aurelius and Epictetus: separating what is in your power from what is not.',
     iconName: 'ShieldCheck',
-    badgeColor: 'text-[#f27d26] bg-[#1a1a1a] border-[#333333]',
+    badgeColor: 'text-slate-400 bg-surface-secondary border-theme',
   },
   {
     id: 'actionable',
@@ -52,7 +52,7 @@ export const PERSONA_PRESETS: PersonaMeta[] = [
     subtitle: 'Pragmatic Micro-Steps',
     description: 'Translates introspection into tangible, low-friction habits and tomorrow’s behavioral nudges.',
     iconName: 'Flame',
-    badgeColor: 'text-amber-400 bg-[#1a1a1a] border-[#333333]',
+    badgeColor: 'text-amber-400 bg-surface-secondary border-theme',
   },
 ];
 

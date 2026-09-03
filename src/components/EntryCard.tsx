@@ -29,6 +29,7 @@ interface EntryCardProps {
   onSelectInquiryQuestion?: (question: string) => void;
   onRequestReflection?: (entry: JournalEntry) => void;
   onTalkToGemini?: (entry: JournalEntry) => void;
+  isReflecting?: boolean;
 }
 
 export const EntryCard: React.FC<EntryCardProps> = ({
@@ -41,7 +42,8 @@ export const EntryCard: React.FC<EntryCardProps> = ({
   onOpenPasskeyModal,
   onSelectInquiryQuestion,
   onRequestReflection,
-  onTalkToGemini,
+  onTalkToGemini: _onTalkToGemini,
+  isReflecting = false,
 }) => {
   const [isExpanded, setIsExpanded] = useState(false);
   const [decryptedBody, setDecryptedBody] = useState<string | null>(null);
@@ -301,16 +303,18 @@ export const EntryCard: React.FC<EntryCardProps> = ({
             )}
           </div>
         ) : (
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between flex-wrap gap-2 pt-2 border-t border-theme/40">
             <span className="text-[11px] text-theme-muted font-mono">Private journal entry</span>
-            {onTalkToGemini && (
+            {onRequestReflection && (
               <button
-                id={`entry-talk-gemini-btn-${entry.id}`}
-                onClick={() => onTalkToGemini(entry)}
-                className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-surface-secondary hover:bg-surface-card border border-theme hover:border-accent text-theme-secondary hover:text-accent text-xs font-medium transition-all cursor-pointer shadow-xs"
+                id={`entry-reflect-gemini-btn-${entry.id}`}
+                onClick={() => onRequestReflection(entry)}
+                disabled={isReflecting}
+                className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-accent text-white hover:opacity-90 text-xs font-semibold transition-all cursor-pointer shadow-xs disabled:opacity-60"
+                title="Generate a private, compassionate Gemini reflection for this entry"
               >
-                <Sparkles className="w-3.5 h-3.5 text-accent" />
-                <span>Talk to Gemini</span>
+                <Sparkles className={`w-3.5 h-3.5 ${isReflecting ? 'animate-spin' : ''}`} />
+                <span>{isReflecting ? 'Reflecting...' : 'Reflect with Gemini'}</span>
               </button>
             )}
           </div>

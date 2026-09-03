@@ -27,7 +27,8 @@ import { AdminDashboardView } from './components/AdminDashboardView';
 import { AuthModal } from './components/AuthModal';
 import { PasskeyModal } from './components/PasskeyModal';
 import { WelcomeLandingPage } from './components/WelcomeLandingPage';
-import { fetchSecurityStatus } from './lib/geminiApi';
+import { fetchSecurityStatus, requestAIReflection } from './lib/geminiApi';
+import { decryptText } from './lib/security';
 import { 
   BookOpen, 
   Search, 
@@ -71,6 +72,7 @@ export default function App() {
 
   // Security backend health
   const [securityStatus, setSecurityStatus] = useState<SecurityStatusReport | null>(null);
+  const [isEntryReflectingId, setIsEntryReflectingId] = useState<string | null>(null);
 
   // Listen to Firebase Auth state & verify custom claims strictly for barathsuresh19@gmail.com
   useEffect(() => {
@@ -81,10 +83,31 @@ export default function App() {
         ensureUserDocument(user.uid, user.email, user.displayName);
         recordAuditLog(user.uid, "SESSION_START", "SUCCESS", `Auth session active for ${user.email || user.uid}`, "FIREBASE_AUTH");
         try {
-          // Cryptographically verified token result from Firebase Auth
-          const tokenResult = await user.getIdTokenResult();
+          // Cryptographically verified token result from Firebase Auth with forced refresh
+          let tokenResult = await user.getIdTokenResult(true);
           const isDesignatedEmail = (user.email || "").toLowerCase().trim() === "barathsuresh19@gmail.com";
-          const hasAdminClaim = tokenResult.claims.admin === true;
+          let hasAdminClaim = tokenResult.claims.admin === true;
+
+          // If designated admin lacks claim, attempt backend assignment bootstrap
+          if (isDesignatedEmail && !hasAdminClaim) {
+            try {
+              const res = await fetch("/api/auth/verify-admin-claim", {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                  Authorization: `Bearer ${await user.getIdToken()}`,
+                },
+              });
+              const json = await res.json();
+              if (json.refreshRequired || json.adminClaimAssigned) {
+                tokenResult = await user.getIdTokenResult(true);
+                hasAdminClaim = tokenResult.claims.admin === true;
+              }
+            } catch {
+              // Non-blocking
+            }
+          }
+
           // UX helper only; real authorization boundary is strictly enforced on the backend
           setIsAdminVerified(isDesignatedEmail && hasAdminClaim);
         } catch {
@@ -214,6 +237,55 @@ export default function App() {
     setShowEditor(true);
     setActiveTab('journal');
     window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  // Request AI Reflection directly for an entry
+  const handleRequestReflectionForEntry = async (entry: JournalEntry) => {
+    if (!currentUser) {
+      setIsAuthModalOpen(true);
+      return;
+    }
+
+    if (entry.isEncrypted && isVaultLocked) {
+      setIsPasskeyModalOpen(true);
+      return;
+    }
+
+    setIsEntryReflectingId(entry.id);
+    try {
+      let contentToReflect = entry.content;
+      if (entry.isEncrypted && entry.encryptedPayload && vaultPasskey) {
+        try {
+          contentToReflect = await decryptText(entry.encryptedPayload, vaultPasskey);
+        } catch {
+          // Keep raw content
+        }
+      }
+
+      const reflection = await requestAIReflection({
+        entryId: entry.id,
+        content: contentToReflect,
+        mood: entry.mood,
+        moodScore: entry.moodScore,
+        tags: entry.tags,
+        persona: 'empathetic',
+      });
+
+      // Persist to user's isolated Firestore subcollection
+      await updateJournalEntry(currentUser.uid, entry.id, {
+        aiReflection: reflection,
+      });
+
+      // Update in-memory state
+      setEntries((prev) =>
+        prev.map((e) => (e.id === entry.id ? { ...e, aiReflection: reflection } : e))
+      );
+    } catch (err: any) {
+      console.error("[Gemini Reflection Error]:", err);
+      alert(err.message || "Failed to generate reflection securely.");
+    } finally {
+      setIsEntryReflectingId(null);
+    }
   };
 
   // Filter entries
@@ -446,12 +518,8 @@ export default function App() {
                     onDelete={handleDeleteEntry}
                     onOpenPasskeyModal={() => setIsPasskeyModalOpen(true)}
                     onSelectInquiryQuestion={handleSelectPrompt}
-                    onRequestReflection={handleStartEdit}
-                    onTalkToGemini={(entryToDiscuss) => {
-                      setGeminiFocusedEntry(entryToDiscuss);
-                      setGeminiInitialPrompt(null);
-                      setActiveTab('gemini');
-                    }}
+                    onRequestReflection={handleRequestReflectionForEntry}
+                    isReflecting={isEntryReflectingId === entry.id}
                   />
                 ))
               )}
@@ -492,7 +560,7 @@ export default function App() {
                     <div className="w-8 h-8 rounded-xl bg-emerald-500/10 flex items-center justify-center text-emerald-500">
                       <TrendingUp className="w-4 h-4" />
                     </div>
-                    <span className="text-xs font-semibold text-theme-primary">Emotional Trends & Patterns</span>
+                    <span className="text-xs font-semibold text-theme-primary">Summary & Insights</span>
                   </div>
                   <ArrowRight className="w-4 h-4 text-theme-muted group-hover:text-emerald-500 group-hover:translate-x-0.5 transition-all" />
                 </div>
@@ -520,10 +588,13 @@ export default function App() {
           </div>
         )}
 
-        {/* TAB 3: INSIGHTS & ANALYTICS */}
+        {/* TAB 3: SUMMARY & INSIGHTS */}
         {activeTab === 'insights' && (
           <div className="animate-fade-in">
-            <InsightsDashboard entries={entries} />
+            <InsightsDashboard 
+              entries={entries} 
+              onOpenGemini={() => setActiveTab('gemini')}
+            />
           </div>
         )}
 

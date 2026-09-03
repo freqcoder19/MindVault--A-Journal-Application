@@ -5,9 +5,6 @@ import {
   TrendingUp, 
   Settings,
   ShieldCheck,
-  Lock, 
-  Unlock, 
-  LogOut, 
   User as UserIcon,
   Sun,
   Moon
@@ -22,10 +19,10 @@ interface NavigationHeaderProps {
   onTabChange: (tab: 'journal' | 'gemini' | 'insights' | 'profile' | 'admin') => void;
   onOpenAuth: () => void;
   onSignOut: () => void;
-  isVaultLocked: boolean;
-  onToggleVaultLock: () => void;
-  hasPasskeyConfigured: boolean;
-  securityStatus: SecurityStatusReport | null;
+  isVaultLocked?: boolean;
+  onToggleVaultLock?: () => void;
+  hasPasskeyConfigured?: boolean;
+  securityStatus?: SecurityStatusReport | null;
   isAdminVerified?: boolean;
 }
 
@@ -34,9 +31,9 @@ export const NavigationHeader: React.FC<NavigationHeaderProps> = ({
   activeTab,
   onTabChange,
   onOpenAuth,
-  onSignOut,
-  isVaultLocked,
-  onToggleVaultLock,
+  onSignOut: _onSignOut,
+  isVaultLocked: _isVaultLocked,
+  onToggleVaultLock: _onToggleVaultLock,
   hasPasskeyConfigured: _hasPasskeyConfigured,
   securityStatus: _securityStatus,
   isAdminVerified = false,
@@ -146,7 +143,7 @@ export const NavigationHeader: React.FC<NavigationHeaderProps> = ({
             }`}
           >
             <TrendingUp className="w-3.5 h-3.5 text-accent" />
-            <span>Insights</span>
+            <span>Summary</span>
           </button>
 
           <button
@@ -213,30 +210,6 @@ export const NavigationHeader: React.FC<NavigationHeaderProps> = ({
               <span>Dark</span>
             </button>
           </div>
-
-          {/* Client Vault Lock Toggle */}
-          <button
-            id="header-vault-lock-btn"
-            onClick={onToggleVaultLock}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-medium transition-all ${
-              isVaultLocked
-                ? 'bg-rose-500/10 border-rose-500/30 text-rose-600 dark:text-rose-400 hover:bg-rose-500/20'
-                : 'bg-surface-secondary border-theme text-theme-secondary hover:text-theme-primary hover:border-accent/40'
-            }`}
-            title={isVaultLocked ? "Vault is Locked. Click to unlock with passkey." : "Vault is Unlocked. Click to lock sensitive entries."}
-          >
-            {isVaultLocked ? (
-              <>
-                <Lock className="w-3.5 h-3.5 text-rose-500" />
-                <span>Locked</span>
-              </>
-            ) : (
-              <>
-                <Unlock className="w-3.5 h-3.5 text-emerald-500" />
-                <span>Unlocked</span>
-              </>
-            )}
-          </button>
 
           {/* User Profile / Auth Status */}
           {currentUser ? (

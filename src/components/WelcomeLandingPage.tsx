@@ -392,17 +392,17 @@ export const WelcomeLandingPage: React.FC<WelcomeLandingPageProps> = ({ onOpenAu
             </div>
           </div>
 
-          {/* Card 3: Thought Loop */}
+          {/* Card 3: Summary & Insights */}
           <div className="group p-6 rounded-2xl bg-[#101518]/60 hover:bg-[#131b20] border border-[#1e2930] hover:border-[#48ab9e]/40 transition-all duration-300 shadow-xs flex flex-col justify-between">
             <div className="space-y-3">
               <div className="w-10 h-10 rounded-xl bg-[#151f24] border border-[#233139] flex items-center justify-center text-[#48ab9e] group-hover:scale-105 transition-transform">
                 <TrendingUp className="w-5 h-5" />
               </div>
               <h3 className="font-display text-sm font-bold text-white tracking-wide">
-                THOUGHT LOOP
+                SUMMARY & INSIGHTS
               </h3>
               <p className="text-xs text-[#9ea8a5] leading-relaxed">
-                Notice recurring patterns when they matter.
+                Track emotional trends and mindful syntheses over time.
               </p>
             </div>
           </div>
