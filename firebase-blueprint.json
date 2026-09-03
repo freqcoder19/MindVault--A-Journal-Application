@@ -13,6 +13,7 @@
         "tags": { "type": "array", "description": "Categorization tags" },
         "isEncrypted": { "type": "boolean", "description": "Client vault encryption flag" },
         "isLocked": { "type": "boolean", "description": "Private lock active" },
+        "images": { "type": "array", "description": "Up to 2 private journal memory photo references in Cloud Storage" },
         "aiReflection": { "type": "object", "description": "Gemini reflection response" },
         "createdAt": { "type": "string", "description": "ISO timestamp" },
         "updatedAt": { "type": "string", "description": "ISO timestamp" }

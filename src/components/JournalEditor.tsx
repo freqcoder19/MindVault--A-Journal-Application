@@ -10,26 +10,33 @@ import {
   Smile, 
   Check, 
   AlertCircle, 
-  BrainCircuit, 
-  RotateCcw,
-  Sliders,
-  ChevronDown,
-  Info
+  Repeat,
+  Camera,
+  X,
+  Plus,
+  Loader2,
+  ChevronDown
 } from 'lucide-react';
 import { MOOD_PRESETS, PERSONA_PRESETS, DEFAULT_TAGS } from '../lib/constants';
-import { MoodType, PersonaType, JournalEntry, AIReflectionData } from '../types';
+import { MoodType, PersonaType, JournalEntry, AIReflectionData, JournalImage } from '../types';
 import { requestAIReflection } from '../lib/geminiApi';
 import { encryptText, sanitizeInput } from '../lib/security';
 import { recordAuditLog } from '../lib/journalService';
+import { uploadJournalMemoryPhoto, validateImageFile, MAX_IMAGES_PER_ENTRY } from '../lib/storageService';
+import { ImagePreviewModal } from './ImagePreviewModal';
 
 interface JournalEditorProps {
   userId: string;
   initialEntry?: JournalEntry | null;
-  onSave: (entryData: Omit<JournalEntry, 'id' | 'userId' | 'createdAt' | 'updatedAt'>) => Promise<void>;
+  onSave: (entryData: Omit<JournalEntry, 'id' | 'userId' | 'createdAt' | 'updatedAt'>) => Promise<string | void>;
   onCancelEdit?: () => void;
   vaultPasskey: string | null;
   onOpenPasskeyModal: () => void;
   defaultPrompt?: string | null;
+  onNavigateToLoops?: () => void;
+  onNavigateToReflections?: () => void;
+  onTalkToGeminiEntry?: (entry: JournalEntry) => void;
+  onNavigateToGemini?: () => void;
 }
 
 export const JournalEditor: React.FC<JournalEditorProps> = ({
@@ -40,6 +47,10 @@ export const JournalEditor: React.FC<JournalEditorProps> = ({
   vaultPasskey,
   onOpenPasskeyModal,
   defaultPrompt,
+  onNavigateToLoops: _onNavigateToLoops,
+  onNavigateToReflections: _onNavigateToReflections,
+  onTalkToGeminiEntry,
+  onNavigateToGemini,
 }) => {
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
@@ -49,6 +60,19 @@ export const JournalEditor: React.FC<JournalEditorProps> = ({
   const [showTagPicker, setShowTagPicker] = useState(false);
   const [selectedPersona, setSelectedPersona] = useState<PersonaType>('empathetic');
   const [isEncryptedVault, setIsEncryptedVault] = useState(false);
+
+  // Journal Memory Photos State (max 2 images)
+  const [images, setImages] = useState<JournalImage[]>([]);
+  const [uploadingImage, setUploadingImage] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [imageError, setImageError] = useState<string | null>(null);
+  const [previewingImage, setPreviewingImage] = useState<JournalImage | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Post-Save Workflow State
+  const [savedEntryId, setSavedEntryId] = useState<string | null>(null);
+  const [savedSuccessMessage, setSavedSuccessMessage] = useState<string | null>(null);
+  const [lastSavedEntry, setLastSavedEntry] = useState<JournalEntry | null>(null);
 
   // AI Reflection states
   const [isReflecting, setIsReflecting] = useState(false);
@@ -67,12 +91,22 @@ export const JournalEditor: React.FC<JournalEditorProps> = ({
       setContent(initialEntry.content || '');
       setMood(initialEntry.mood || 'reflective');
       setTags(initialEntry.tags || []);
+      setImages(initialEntry.images || []);
       setIsEncryptedVault(initialEntry.isEncrypted || false);
       setCurrentReflection(initialEntry.aiReflection || null);
+      setSavedEntryId(null);
+      setSavedSuccessMessage(null);
     } else if (defaultPrompt) {
       setTitle('');
       setContent(`Prompt: ${defaultPrompt}\n\n`);
       setMood('reflective');
+      setImages([]);
+      setSavedEntryId(null);
+      setSavedSuccessMessage(null);
+    } else {
+      setImages([]);
+      setSavedEntryId(null);
+      setSavedSuccessMessage(null);
     }
   }, [initialEntry, defaultPrompt]);
 
@@ -112,7 +146,7 @@ export const JournalEditor: React.FC<JournalEditorProps> = ({
 
   const toggleVoiceDictation = () => {
     if (!recognitionRef.current) {
-      alert("Voice speech recognition is not supported in this browser environment. You can type directly in the journal.");
+      alert("Voice speech recognition is not supported in this browser. You can write your thoughts directly in the journal.");
       return;
     }
     if (isListening) {
@@ -142,11 +176,61 @@ export const JournalEditor: React.FC<JournalEditorProps> = ({
     setTags(tags.filter(t => t !== tagToRemove));
   };
 
-  // Trigger Gemini Reflection
+  // Image Selection & Upload Handler
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+
+    setImageError(null);
+
+    if (images.length >= MAX_IMAGES_PER_ENTRY) {
+      setImageError(`Each journal entry is limited to a maximum of ${MAX_IMAGES_PER_ENTRY} memory photos.`);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+      return;
+    }
+
+    const file = files[0];
+    const validation = validateImageFile(file, images.length);
+    if (!validation.valid) {
+      setImageError(validation.error || 'Invalid image file.');
+      if (fileInputRef.current) fileInputRef.current.value = '';
+      return;
+    }
+
+    setUploadingImage(true);
+    setUploadProgress(0);
+
+    try {
+      const tempEntryId = initialEntry?.id || `draft_${Date.now()}`;
+      const uploadedImage = await uploadJournalMemoryPhoto({
+        userId,
+        entryId: tempEntryId,
+        file,
+        onProgress: (percent) => setUploadProgress(percent),
+      });
+
+      setImages(prev => [...prev, uploadedImage]);
+      setImageError(null);
+    } catch (err: any) {
+      console.error("Image upload failed:", err);
+      setImageError(err.message || 'Failed to attach image memory.');
+    } finally {
+      setUploadingImage(false);
+      setUploadProgress(0);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  };
+
+  const handleRemoveImage = (imageId: string) => {
+    setImages(prev => prev.filter(img => img.id !== imageId));
+    setImageError(null);
+  };
+
+  // Trigger Gemini Reflection (Operates strictly on text/context, never automatically sends photos)
   const handleGenerateReflection = async () => {
     const cleanContent = sanitizeInput(content);
     if (!cleanContent) {
-      setAiError("Please write some journal content before requesting an AI reflection.");
+      setAiError("Please write some journal thoughts before requesting an AI reflection.");
       return;
     }
 
@@ -194,6 +278,7 @@ export const JournalEditor: React.FC<JournalEditorProps> = ({
     }
 
     setSaving(true);
+    setSavedSuccessMessage(null);
     try {
       let finalContent = content;
       let encryptedPayload: string | undefined = undefined;
@@ -215,19 +300,35 @@ export const JournalEditor: React.FC<JournalEditorProps> = ({
         mood,
         moodScore: currentMoodMeta.score,
         tags,
+        images: images.length > 0 ? images : undefined,
         isEncrypted: isEncryptedVault,
         ...(encryptedPayload ? { encryptedPayload } : {}),
         ...(currentReflection ? { aiReflection: currentReflection } : {}),
       };
 
-      await onSave(entryPayload);
+      const resultId = await onSave(entryPayload);
+      const savedId = typeof resultId === 'string' ? resultId : initialEntry?.id || `saved-${Date.now()}`;
 
-      // Reset form if creating fresh
+      const fullSavedEntry: JournalEntry = {
+        id: savedId,
+        userId,
+        ...entryPayload,
+        content: content.trim(), // preserved unencrypted in memory for seamless transition to talk to Gemini
+        createdAt: initialEntry?.createdAt || new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      };
+
+      setSavedEntryId(savedId);
+      setLastSavedEntry(fullSavedEntry);
+      setSavedSuccessMessage("Entry saved securely to your journal.");
+
+      // If updating, maintain content; if new entry, keep clean state for follow-up options
       if (!initialEntry) {
         setTitle('');
         setContent('');
-        setCurrentReflection(null);
         setTags(['Mindfulness']);
+        setImages([]);
+        setCurrentReflection(null);
       }
     } catch (err: any) {
       console.error("Save error:", err);
@@ -242,33 +343,44 @@ export const JournalEditor: React.FC<JournalEditorProps> = ({
   const readTimeMin = Math.ceil(wordCount / 200);
 
   return (
-    <section className="bg-[#121212] border border-[#262626] rounded-3xl p-6 md:p-8 shadow-2xl relative transition-all">
+    <section className="bg-surface-card border border-theme rounded-3xl p-6 md:p-8 shadow-xs relative transition-all">
+      
+      {/* Hidden File Input for Image Memories */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        id="journal-memory-file-input"
+        accept="image/jpeg,image/png,image/webp"
+        className="hidden"
+        onChange={handleFileChange}
+      />
+
       <form onSubmit={handleSubmit} className="space-y-6">
         
-        {/* Editor Top Bar: Mood & Actions */}
-        <div className="flex flex-wrap items-center justify-between gap-3 pb-4 border-b border-[#262626]">
+        {/* Editor Top Bar: Mood & Tools */}
+        <div className="flex flex-wrap items-center justify-between gap-3 pb-4 border-b border-theme">
           
-          {/* Mood Selector Dropdown / Pill */}
+          {/* Mood Selector Dropdown */}
           <div className="flex items-center gap-2">
-            <span className="text-xs text-[#737373] font-medium hidden sm:inline">Inner State:</span>
+            <span className="text-xs text-theme-muted font-medium hidden sm:inline">Inner State:</span>
             <div className="relative group">
               <select
                 id="journal-mood-select"
                 value={mood}
                 onChange={(e) => setMood(e.target.value as MoodType)}
-                className={`appearance-none text-xs font-semibold py-1.5 pl-3 pr-8 rounded-xl border transition-all cursor-pointer bg-[#0a0a0a] focus:outline-none focus:border-[#f27d26]/60 ${currentMoodMeta.bgColor} ${currentMoodMeta.color}`}
+                className={`appearance-none text-xs font-semibold py-1.5 pl-3 pr-8 rounded-xl border transition-all cursor-pointer bg-surface-secondary border-theme text-theme-primary focus:outline-none focus:border-accent`}
               >
                 {MOOD_PRESETS.map((m) => (
-                  <option key={m.type} value={m.type} className="bg-[#121212] text-[#d4d4d4]">
+                  <option key={m.type} value={m.type} className="bg-surface-card text-theme-primary">
                     {m.emoji} {m.label} (Score: {m.score}/5)
                   </option>
                 ))}
               </select>
-              <Smile className="w-3.5 h-3.5 absolute right-2.5 top-2.5 text-[#737373] pointer-events-none" />
+              <Smile className="w-3.5 h-3.5 absolute right-2.5 top-2.5 text-theme-muted pointer-events-none" />
             </div>
           </div>
 
-          {/* Right Tools: Voice, Zero-Knowledge Vault Encryption, Persona */}
+          {/* Right Tools: Voice & Zero-Knowledge Encryption */}
           <div className="flex items-center gap-2">
             
             {/* Voice Dictation Button */}
@@ -278,12 +390,12 @@ export const JournalEditor: React.FC<JournalEditorProps> = ({
               onClick={toggleVoiceDictation}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-medium transition-all ${
                 isListening
-                  ? 'bg-[#1a1a1a] border-[#e11d48] text-[#e11d48] animate-pulse'
-                  : 'bg-[#0a0a0a] border-[#262626] text-[#737373] hover:text-[#d4d4d4] hover:border-[#333333]'
+                  ? 'bg-rose-500/10 border-rose-500 text-rose-600 dark:text-rose-400 animate-pulse'
+                  : 'bg-surface-secondary border-theme text-theme-secondary hover:text-theme-primary hover:border-accent/40'
               }`}
               title={isListening ? "Listening... Click to stop" : "Dictate your thoughts via Voice"}
             >
-              {isListening ? <MicOff className="w-3.5 h-3.5 text-[#e11d48]" /> : <Mic className="w-3.5 h-3.5" />}
+              {isListening ? <MicOff className="w-3.5 h-3.5 text-rose-500" /> : <Mic className="w-3.5 h-3.5" />}
               <span className="hidden sm:inline">{isListening ? 'Listening...' : 'Voice'}</span>
             </button>
 
@@ -299,19 +411,19 @@ export const JournalEditor: React.FC<JournalEditorProps> = ({
               }}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-medium transition-all ${
                 isEncryptedVault
-                  ? 'bg-[#1a1a1a] border-[#f27d26]/50 text-[#f27d26] shadow-sm'
-                  : 'bg-[#0a0a0a] border-[#262626] text-[#737373] hover:text-[#d4d4d4]'
+                  ? 'bg-accent-subtle border-accent text-accent font-semibold'
+                  : 'bg-surface-secondary border-theme text-theme-muted hover:text-theme-primary'
               }`}
               title="Client-side AES-GCM Zero-Knowledge Encryption"
             >
               {isEncryptedVault ? (
                 <>
-                  <Lock className="w-3.5 h-3.5 text-[#f27d26]" />
+                  <Lock className="w-3.5 h-3.5 text-accent" />
                   <span>Passkey Vault</span>
                 </>
               ) : (
                 <>
-                  <Unlock className="w-3.5 h-3.5 text-[#737373]" />
+                  <Unlock className="w-3.5 h-3.5 text-theme-muted" />
                   <span>Standard Isolation</span>
                 </>
               )}
@@ -327,7 +439,7 @@ export const JournalEditor: React.FC<JournalEditorProps> = ({
             value={title}
             onChange={(e) => setTitle(e.target.value)}
             placeholder="Give this reflection a title (or leave blank for date)..."
-            className="w-full bg-transparent border-0 border-b border-[#262626] focus:border-[#f27d26]/60 pb-2.5 text-base md:text-lg font-display text-white placeholder-[#525252] focus:outline-none transition-colors"
+            className="w-full bg-transparent border-0 border-b border-theme focus:border-accent pb-2.5 text-base md:text-lg font-display text-theme-primary placeholder-theme-muted focus:outline-none transition-colors"
           />
         </div>
 
@@ -339,37 +451,37 @@ export const JournalEditor: React.FC<JournalEditorProps> = ({
             value={content}
             onChange={(e) => setContent(e.target.value)}
             placeholder="Unpack your raw thoughts, sensations, vulnerabilities, or insights freely. MindVault strictly isolates this to your authenticated UID..."
-            className="w-full bg-[#0a0a0a] border border-[#262626] rounded-2xl p-4.5 text-[#d4d4d4] placeholder-[#525252] font-serif-body text-base leading-relaxed focus:outline-none focus:border-[#f27d26]/50 transition-all resize-y min-h-[160px]"
+            className="w-full bg-surface-secondary border border-theme rounded-2xl p-4 text-theme-primary placeholder-theme-muted font-serif-body text-base leading-relaxed focus:outline-none focus:border-accent transition-all resize-y min-h-[160px]"
           />
 
-          {/* Word count & reading time footer */}
-          <div className="flex items-center justify-between text-[11px] font-mono text-[#525252] px-2 mt-1.5">
+          {/* Word count footer */}
+          <div className="flex items-center justify-between text-[11px] font-mono text-theme-muted px-2 mt-1.5">
             <span>{wordCount} words • ~{readTimeMin} min read</span>
             {isEncryptedVault && (
-              <span className="text-[#f27d26]/80 flex items-center gap-1">
+              <span className="text-accent flex items-center gap-1 font-medium">
                 <Lock className="w-3 h-3" /> AES-256 GCM Client Encryption
               </span>
             )}
           </div>
         </div>
 
-        {/* Tags & Categorization Section */}
+        {/* Tags Section */}
         <div className="space-y-2">
           <div className="flex flex-wrap items-center gap-1.5">
-            <span className="text-xs text-[#737373] font-medium mr-1 flex items-center gap-1">
-              <TagIcon className="w-3 h-3 text-[#525252]" /> Tags:
+            <span className="text-xs text-theme-muted font-medium mr-1 flex items-center gap-1">
+              <TagIcon className="w-3 h-3 text-theme-muted" /> Tags:
             </span>
 
             {tags.map((t) => (
               <span
                 key={t}
-                className="inline-flex items-center gap-1 text-xs px-2.5 py-0.5 rounded-lg bg-[#1a1a1a] text-[#d4d4d4] border border-[#333333]"
+                className="inline-flex items-center gap-1 text-xs px-2.5 py-0.5 rounded-lg bg-surface-secondary text-theme-secondary border border-theme"
               >
                 #{t}
                 <button
                   type="button"
                   onClick={() => handleRemoveTag(t)}
-                  className="hover:text-[#e11d48] ml-0.5 text-[#737373]"
+                  className="hover:text-rose-500 ml-0.5 text-theme-muted transition-colors"
                 >
                   &times;
                 </button>
@@ -390,13 +502,13 @@ export const JournalEditor: React.FC<JournalEditorProps> = ({
                   }
                 }}
                 placeholder="+ Add tag..."
-                className="text-xs bg-[#0a0a0a] border border-[#262626] rounded-lg px-2 py-0.5 text-[#d4d4d4] placeholder-[#525252] focus:outline-none focus:border-[#f27d26]/50 w-24"
+                className="text-xs bg-surface-secondary border border-theme rounded-lg px-2 py-0.5 text-theme-primary placeholder-theme-muted focus:outline-none focus:border-accent w-24"
               />
               
               <button
                 type="button"
                 onClick={() => setShowTagPicker(!showTagPicker)}
-                className="ml-1 p-1 text-[#737373] hover:text-[#d4d4d4]"
+                className="ml-1 p-1 text-theme-muted hover:text-theme-primary transition-colors"
                 title="Browse suggested tags"
               >
                 <ChevronDown className="w-3 h-3" />
@@ -406,7 +518,7 @@ export const JournalEditor: React.FC<JournalEditorProps> = ({
 
           {/* Suggested tags palette */}
           {showTagPicker && (
-            <div className="p-3 bg-[#0a0a0a] border border-[#262626] rounded-xl flex flex-wrap gap-1.5 animate-fade-in">
+            <div className="p-3 bg-surface-secondary border border-theme rounded-xl flex flex-wrap gap-1.5 animate-fade-in">
               {DEFAULT_TAGS.map((suggested) => (
                 <button
                   key={suggested}
@@ -415,8 +527,8 @@ export const JournalEditor: React.FC<JournalEditorProps> = ({
                   disabled={tags.includes(suggested)}
                   className={`text-xs px-2.5 py-1 rounded-lg border transition-colors ${
                     tags.includes(suggested)
-                      ? 'bg-[#121212] border-[#262626] text-[#525252] cursor-default'
-                      : 'bg-[#1a1a1a] border-[#333333] text-[#a3a3a3] hover:text-[#f27d26] hover:border-[#f27d26]/40'
+                      ? 'bg-surface-card border-theme text-theme-muted opacity-60 cursor-default'
+                      : 'bg-surface-card border-theme text-theme-secondary hover:text-accent hover:border-accent/40'
                   }`}
                 >
                   +{suggested}
@@ -426,17 +538,123 @@ export const JournalEditor: React.FC<JournalEditorProps> = ({
           )}
         </div>
 
-        {/* Gemini AI Reflection Trigger Bar */}
-        <div className="bg-[#0a0a0a] border border-[#262626] rounded-2xl p-4.5">
+        {/* FEATURE 2: Private Journal Memory Photos Section */}
+        <div className="space-y-3 pt-2 border-t border-theme">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Camera className="w-4 h-4 text-accent" />
+              <span className="text-xs font-semibold text-theme-primary">Private Journal Memory</span>
+              <span className="text-[11px] font-mono text-theme-muted">({images.length}/2 photos)</span>
+            </div>
+
+            {images.length < MAX_IMAGES_PER_ENTRY && (
+              <button
+                id="journal-add-memory-btn"
+                type="button"
+                disabled={uploadingImage}
+                onClick={() => fileInputRef.current?.click()}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-surface-secondary hover:bg-surface-card border border-theme hover:border-accent text-accent text-xs font-medium transition-all cursor-pointer disabled:opacity-50"
+              >
+                <Camera className="w-3.5 h-3.5" />
+                <span>📷 Add a memory</span>
+              </button>
+            )}
+          </div>
+
+          {/* Upload Progress Bar */}
+          {uploadingImage && (
+            <div className="p-3 rounded-xl bg-surface-secondary border border-theme space-y-2 animate-fade-in">
+              <div className="flex items-center justify-between text-xs text-theme-secondary font-mono">
+                <span className="flex items-center gap-2">
+                  <Loader2 className="w-3.5 h-3.5 animate-spin text-accent" />
+                  Encrypting & uploading memory photo...
+                </span>
+                <span>{uploadProgress}%</span>
+              </div>
+              <div className="w-full h-1.5 bg-surface-card rounded-full overflow-hidden border border-theme">
+                <div 
+                  className="h-full bg-accent transition-all duration-200 rounded-full"
+                  style={{ width: `${Math.max(5, uploadProgress)}%` }}
+                />
+              </div>
+            </div>
+          )}
+
+          {/* Image Validation Error Alert */}
+          {imageError && (
+            <div className="p-2.5 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-600 dark:text-rose-400 text-xs flex items-center justify-between gap-2 animate-fade-in">
+              <div className="flex items-center gap-2">
+                <AlertCircle className="w-4 h-4 shrink-0" />
+                <span>{imageError}</span>
+              </div>
+              <button 
+                type="button" 
+                onClick={() => setImageError(null)}
+                className="text-rose-500 hover:text-rose-700 p-1"
+              >
+                &times;
+              </button>
+            </div>
+          )}
+
+          {/* Selected Images Thumbnails Preview Before Saving */}
+          {images.length > 0 && (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+              {images.map((img, idx) => (
+                <div 
+                  key={img.id || idx}
+                  className="relative group bg-surface-secondary border border-theme rounded-2xl p-2.5 flex items-center gap-3 transition-all hover:border-accent/40"
+                >
+                  <img 
+                    src={img.url} 
+                    alt={img.name || `Memory ${idx + 1}`}
+                    className="w-16 h-16 object-cover rounded-xl border border-theme shrink-0 cursor-pointer hover:opacity-90 transition-opacity"
+                    onClick={() => setPreviewingImage(img)}
+                    referrerPolicy="no-referrer"
+                  />
+                  
+                  <div className="min-w-0 flex-1">
+                    <p className="text-xs font-semibold text-theme-primary truncate" title={img.name}>
+                      {img.name || `Memory ${idx + 1}`}
+                    </p>
+                    <p className="text-[11px] font-mono text-theme-muted mt-0.5">
+                      {(img.size / 1024).toFixed(0)} KB • Private
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => setPreviewingImage(img)}
+                      className="text-[11px] text-accent hover:underline font-medium mt-1 inline-block"
+                    >
+                      View full size
+                    </button>
+                  </div>
+
+                  <button
+                    id={`journal-remove-memory-btn-${idx}`}
+                    type="button"
+                    onClick={() => handleRemoveImage(img.id)}
+                    className="p-1.5 rounded-lg text-theme-muted hover:text-rose-500 hover:bg-surface-card transition-colors shrink-0"
+                    title="Remove memory photo"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Optional Gemini AI Reflection Bar (Manual Trigger Only) */}
+        <div className="bg-surface-secondary border border-theme rounded-2xl p-4">
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-3">
             <div className="flex items-center gap-2.5">
-              <div className="p-2 rounded-xl bg-[#1a1a1a] text-[#f27d26] border border-[#333333]">
+              <div className="p-2 rounded-xl bg-surface-card text-accent border border-theme">
                 <Sparkles className="w-4 h-4" />
               </div>
               <div>
-                <h4 className="text-xs font-semibold text-white">Gemini Cognitive Reflection</h4>
-                <p className="text-[11px] text-[#737373]">
-                  Select an AI thinking style for confidential cognitive analysis
+                <h4 className="text-xs font-semibold text-theme-primary">Gemini Cognitive Reflection</h4>
+                <p className="text-[11px] text-theme-muted">
+                  Private text analysis using server-side Gemini 2.5 Flash
                 </p>
               </div>
             </div>
@@ -446,10 +664,10 @@ export const JournalEditor: React.FC<JournalEditorProps> = ({
               id="journal-persona-select"
               value={selectedPersona}
               onChange={(e) => setSelectedPersona(e.target.value as PersonaType)}
-              className="text-xs bg-[#1a1a1a] border border-[#333333] text-[#f27d26] font-medium rounded-xl px-3 py-1.5 focus:outline-none focus:border-[#f27d26]"
+              className="text-xs bg-surface-card border border-theme text-theme-primary font-medium rounded-xl px-3 py-1.5 focus:outline-none focus:border-accent"
             >
               {PERSONA_PRESETS.map((p) => (
-                <option key={p.id} value={p.id} className="bg-[#121212] text-[#d4d4d4]">
+                <option key={p.id} value={p.id} className="bg-surface-card text-theme-primary">
                   {p.name} ({p.subtitle})
                 </option>
               ))}
@@ -462,22 +680,22 @@ export const JournalEditor: React.FC<JournalEditorProps> = ({
               type="button"
               disabled={isReflecting || !content.trim()}
               onClick={handleGenerateReflection}
-              className="flex items-center gap-2 px-4 py-2 rounded-xl bg-[#1a1a1a] hover:bg-[#262626] border border-[#333333] hover:border-[#f27d26] text-white hover:text-[#f27d26] text-xs font-semibold shadow-sm transition-all disabled:opacity-40"
+              className="flex items-center gap-2 px-4 py-2 rounded-xl bg-surface-card hover:bg-surface-secondary border border-theme hover:border-accent text-theme-primary hover:text-accent text-xs font-semibold shadow-xs transition-all disabled:opacity-40"
             >
-              <Sparkles className={`w-3.5 h-3.5 text-[#f27d26] ${isReflecting ? 'animate-spin' : ''}`} />
+              <Sparkles className={`w-3.5 h-3.5 text-accent ${isReflecting ? 'animate-spin' : ''}`} />
               <span>{isReflecting ? 'Gemini Reflecting...' : 'Reflect with Gemini'}</span>
             </button>
 
             {currentReflection && (
-              <span className="text-xs text-emerald-400 flex items-center gap-1.5 font-mono">
+              <span className="text-xs text-emerald-600 dark:text-emerald-400 flex items-center gap-1.5 font-mono">
                 <Check className="w-3.5 h-3.5" /> Reflection Ready
               </span>
             )}
           </div>
 
-          {/* AI Error Notification */}
+          {/* AI Error Alert */}
           {aiError && (
-            <div className="mt-3 p-2.5 rounded-xl bg-[#1a1a1a] border border-[#e11d48]/40 text-[#e11d48] text-xs flex items-center gap-2">
+            <div className="mt-3 p-2.5 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-600 dark:text-rose-400 text-xs flex items-center gap-2">
               <AlertCircle className="w-3.5 h-3.5 shrink-0" />
               <span>{aiError}</span>
             </div>
@@ -486,34 +704,34 @@ export const JournalEditor: React.FC<JournalEditorProps> = ({
 
         {/* Live Reflection Preview (if generated before saving) */}
         {currentReflection && (
-          <div className="p-5 rounded-2xl bg-[#0a0a0a] border border-[#333333] space-y-3.5 animate-fade-in">
+          <div className="p-5 rounded-2xl bg-surface-secondary border border-theme space-y-3 animate-fade-in">
             <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold text-[#f27d26] font-display flex items-center gap-1.5">
+              <span className="text-xs font-semibold text-accent font-display flex items-center gap-1.5">
                 <Sparkles className="w-3.5 h-3.5" /> Gemini Reflection Analysis
               </span>
-              <span className="text-[10px] uppercase font-mono px-2.5 py-0.5 rounded-full bg-[#1a1a1a] text-[#f27d26] border border-[#333333]">
+              <span className="text-[10px] uppercase font-mono px-2 py-0.5 rounded-full bg-surface-card text-accent border border-theme">
                 {currentReflection.personaUsed || selectedPersona}
               </span>
             </div>
             
-            <p className="text-xs md:text-sm text-[#d4d4d4] leading-relaxed font-serif-body italic">
+            <p className="text-xs md:text-sm text-theme-primary leading-relaxed font-serif-body italic">
               "{currentReflection.reflection}"
             </p>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5 text-xs pt-2 border-t border-[#262626]">
-              <div className="p-3 rounded-xl bg-[#121212] border border-[#262626]">
-                <span className="text-[10px] text-[#f27d26] font-bold uppercase tracking-wider block mb-1">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5 text-xs pt-2 border-t border-theme">
+              <div className="p-3 rounded-xl bg-surface-card border border-theme">
+                <span className="text-[10px] text-accent font-bold uppercase tracking-wider block mb-1">
                   💡 Cognitive Reframe
                 </span>
-                <p className="text-[#a3a3a3] text-xs leading-relaxed">{currentReflection.cognitiveReframe}</p>
+                <p className="text-theme-secondary text-xs leading-relaxed">{currentReflection.cognitiveReframe}</p>
               </div>
 
               {currentReflection.actionableNudge && (
-                <div className="p-3 rounded-xl bg-[#121212] border border-[#262626]">
-                  <span className="text-[10px] text-emerald-400 font-bold uppercase tracking-wider block mb-1">
+                <div className="p-3 rounded-xl bg-surface-card border border-theme">
+                  <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-bold uppercase tracking-wider block mb-1">
                     🌿 Mindful Micro-Nudge
                   </span>
-                  <p className="text-[#a3a3a3] text-xs leading-relaxed">{currentReflection.actionableNudge}</p>
+                  <p className="text-theme-secondary text-xs leading-relaxed">{currentReflection.actionableNudge}</p>
                 </div>
               )}
             </div>
@@ -521,13 +739,13 @@ export const JournalEditor: React.FC<JournalEditorProps> = ({
         )}
 
         {/* Action Controls: Submit / Cancel */}
-        <div className="flex items-center justify-end gap-3 pt-4 border-t border-[#262626]">
+        <div className="flex items-center justify-end gap-3 pt-4 border-t border-theme">
           {onCancelEdit && (
             <button
               id="journal-cancel-edit-btn"
               type="button"
               onClick={onCancelEdit}
-              className="px-4 py-2 rounded-xl bg-[#1a1a1a] hover:bg-[#262626] border border-[#333333] text-[#d4d4d4] text-xs font-medium transition-colors"
+              className="px-4 py-2 rounded-xl bg-surface-secondary hover:bg-surface-card border border-theme text-theme-secondary text-xs font-medium transition-colors"
             >
               Cancel Edit
             </button>
@@ -536,15 +754,83 @@ export const JournalEditor: React.FC<JournalEditorProps> = ({
           <button
             id="journal-save-entry-btn"
             type="submit"
-            disabled={saving || !content.trim()}
-            className="flex items-center gap-2 px-6 py-2.5 rounded-xl bg-[#f27d26] hover:bg-[#e06b16] text-[#0a0a0a] font-bold text-xs shadow-lg transition-all disabled:opacity-50 cursor-pointer"
+            disabled={saving || uploadingImage || !content.trim()}
+            className="flex items-center gap-2 px-6 py-2.5 rounded-xl btn-primary-accent font-medium text-xs shadow-xs transition-all disabled:opacity-50 cursor-pointer"
           >
             <Save className="w-4 h-4" />
-            <span>{saving ? 'Encrypting & Saving...' : (initialEntry ? 'Update MindVault Entry' : 'Save to MindVault')}</span>
+            <span>{saving ? 'Encrypting & Saving...' : (initialEntry ? 'Update MindVault Entry' : 'Save Entry')}</span>
           </button>
         </div>
 
       </form>
+
+      {/* Post-Save Follow-Up Workflow: Natural Choice to Talk to Gemini or Write Another Entry */}
+      {savedSuccessMessage && (
+        <div className="mt-6 p-5 md:p-6 rounded-3xl bg-surface-secondary border border-accent/40 shadow-xs animate-fade-in space-y-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <div className="w-6 h-6 rounded-full bg-emerald-500/10 flex items-center justify-center text-emerald-500">
+                <Check className="w-3.5 h-3.5" />
+              </div>
+              <span className="text-xs font-semibold text-theme-primary">{savedSuccessMessage}</span>
+            </div>
+            <button 
+              onClick={() => {
+                setSavedSuccessMessage(null);
+                setLastSavedEntry(null);
+              }}
+              className="text-theme-muted hover:text-theme-primary text-xs"
+            >
+              &times; Dismiss
+            </button>
+          </div>
+
+          <p className="text-xs text-theme-secondary font-serif-body">
+            Your reflections are securely saved in your journal without any automatic AI analysis. Would you like to talk through what you wrote with Gemini, or write another entry?
+          </p>
+
+          <div className="flex flex-wrap items-center gap-3 pt-1">
+            <button
+              id="post-save-talk-gemini-btn"
+              onClick={() => {
+                if (onTalkToGeminiEntry && lastSavedEntry) {
+                  onTalkToGeminiEntry(lastSavedEntry);
+                } else if (onNavigateToGemini) {
+                  onNavigateToGemini();
+                }
+              }}
+              className="flex items-center gap-2 px-4 py-2.5 rounded-xl btn-primary-accent text-white text-xs font-medium transition-all shadow-xs"
+            >
+              <Sparkles className="w-3.5 h-3.5" />
+              <span>Talk to Gemini about this entry</span>
+            </button>
+
+            <button
+              id="post-save-new-entry-btn"
+              onClick={() => {
+                setSavedSuccessMessage(null);
+                setSavedEntryId(null);
+                setLastSavedEntry(null);
+                setTitle('');
+                setContent('');
+                setTags(['Mindfulness']);
+                setImages([]);
+              }}
+              className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-surface-card hover:bg-surface-secondary border border-theme text-theme-secondary hover:text-theme-primary text-xs font-medium transition-all shadow-xs"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              <span>Write another entry</span>
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Image Preview Modal (Accessible, Dismissible with Esc key) */}
+      <ImagePreviewModal
+        image={previewingImage}
+        onClose={() => setPreviewingImage(null)}
+      />
+
     </section>
   );
 };

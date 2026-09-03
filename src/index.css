@@ -86,3 +86,68 @@
 .animate-fade-in {
   animation: fadeIn 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
+
+/* Theme Utilities */
+.bg-canvas {
+  background-color: var(--bg-canvas);
+}
+
+.bg-surface-card {
+  background-color: var(--surface-card);
+}
+
+.bg-surface-secondary {
+  background-color: var(--surface-secondary);
+}
+
+.bg-surface-elevated {
+  background-color: var(--surface-elevated);
+}
+
+.border-theme {
+  border-color: var(--border-subtle);
+}
+
+.border-theme-card {
+  border-color: var(--border-card);
+}
+
+.border-accent {
+  border-color: var(--accent-border);
+}
+
+.text-theme-primary {
+  color: var(--text-primary);
+}
+
+.text-theme-secondary {
+  color: var(--text-secondary);
+}
+
+.text-theme-muted {
+  color: var(--text-muted);
+}
+
+.text-accent {
+  color: var(--accent-text);
+}
+
+.bg-accent {
+  background-color: var(--accent-primary);
+  color: #ffffff;
+}
+
+.bg-accent-subtle {
+  background-color: var(--accent-subtle);
+}
+
+.btn-primary-accent {
+  background-color: var(--accent-primary);
+  color: #ffffff;
+  transition: all 0.15s ease-in-out;
+}
+
+.btn-primary-accent:hover {
+  background-color: var(--accent-hover);
+}
+

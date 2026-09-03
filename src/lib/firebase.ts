@@ -60,25 +60,24 @@ if (typeof window !== "undefined") {
         isTokenAutoRefreshEnabled: true,
       });
       console.log("[Security] App Check initialized with ReCaptchaEnterpriseProvider.");
-    } else {
-      // In development / sandboxed environments where reCAPTCHA site key is not provisioned,
-      // provide local attestation token provider to support local verification seamlessly.
+    } else if (metaEnv.VITE_APPCHECK_DEBUG_TOKEN) {
+      // Optional development / testing attestation capability
       appCheckInstance = initializeAppCheck(app, {
         provider: new CustomProvider({
-          getToken: async () => {
-            const localToken = (metaEnv.VITE_APPCHECK_DEBUG_TOKEN as string) || "mindvault-local-dev-appcheck-token";
-            return {
-              token: localToken,
-              expireTimeMillis: Date.now() + 60 * 60 * 1000,
-            };
-          }
+          getToken: async () => ({
+            token: String(metaEnv.VITE_APPCHECK_DEBUG_TOKEN),
+            expireTimeMillis: Date.now() + 60 * 60 * 1000,
+          })
         }),
         isTokenAutoRefreshEnabled: true,
       });
-      console.log("[Security] App Check initialized with custom attestation provider.");
+      console.log("[Security] App Check initialized with custom debug provider.");
+    } else {
+      // App Check is optional; inactive when no provider keys are supplied
+      appCheckInstance = null;
     }
   } catch (err: any) {
-    console.warn("[Security] App Check client setup notice:", err.message);
+    console.warn("[Security] App Check optional setup notice:", err.message);
   }
 }
 
@@ -107,6 +106,7 @@ export {
 export type { User };
 
 // Helper to get fresh user ID token for backend authentication
+// Cryptographically signed Firebase ID token containing user UID, email, and verified custom claims
 export async function getUserIdToken(): Promise<string | null> {
   const user = auth.currentUser;
   if (!user) return null;

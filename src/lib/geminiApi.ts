@@ -65,29 +65,25 @@ export async function requestAIReflection(params: ReflectParams): Promise<AIRefl
 }
 
 // Interactive chat dialog on entry (/api/chat or /api/gemini/dialog)
-export async function sendEntryDialog(
-  entryContent: string, 
-  messages: AIChatMessage[], 
-  currentMessage: string,
-  conversationId?: string,
-  entryId?: string
-): Promise<string> {
+export interface GeminiCompanionChatParams {
+  currentMessage: string;
+  history?: Array<{ role: 'user' | 'assistant'; content: string }>;
+  entryId?: string;
+  entryContent?: string;
+  conversationId?: string;
+}
+
+export async function sendGeminiCompanionChat(params: GeminiCompanionChatParams): Promise<string> {
   const token = await getUserIdToken();
   if (!token) {
-    throw new Error("Authentication required.");
+    throw new Error("Authentication required: Please sign in to talk with Gemini.");
   }
 
   const headers = await buildSecureHeaders(true);
   const response = await fetch("/api/chat", {
     method: "POST",
     headers,
-    body: JSON.stringify({
-      entryContent,
-      messages,
-      currentMessage,
-      conversationId,
-      entryId,
-    }),
+    body: JSON.stringify(params),
   });
 
   if (!response.ok) {
@@ -97,6 +93,22 @@ export async function sendEntryDialog(
 
   const data = await response.json();
   return data.reply;
+}
+
+export async function sendEntryDialog(
+  entryContent: string, 
+  messages: AIChatMessage[], 
+  currentMessage: string,
+  conversationId?: string,
+  entryId?: string
+): Promise<string> {
+  return sendGeminiCompanionChat({
+    entryContent,
+    history: messages.map(m => ({ role: m.role, content: m.content })),
+    currentMessage,
+    conversationId,
+    entryId
+  });
 }
 
 // Generate weekly/trend digest from entries
@@ -241,6 +253,32 @@ export async function fetchAdminDashboard(): Promise<AdminDashboardData> {
   if (!response.ok) {
     const err = await response.json().catch(() => ({ error: "Network error" }));
     throw new Error(err.error || `Failed to fetch admin dashboard (${response.status})`);
+  }
+
+  return response.json();
+}
+
+// Fetch Dedicated Admin Aggregate Telemetry (Protected: Verified Single Admin barathsuresh19@gmail.com)
+export async function fetchAdminTelemetry(): Promise<any> {
+  const token = await getUserIdToken();
+  if (!token) {
+    throw new Error("Authentication required: Please sign in as the administrator.");
+  }
+
+  const headers = await buildSecureHeaders(true);
+  const response = await fetch("/api/admin/telemetry", {
+    method: "GET",
+    headers,
+  });
+
+  if (response.status === 403) {
+    const err = await response.json().catch(() => ({ error: "Forbidden" }));
+    throw new Error(err.error || "Access Denied: Administrative privileges required.");
+  }
+
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({ error: "Network error" }));
+    throw new Error(err.error || `Failed to fetch admin telemetry (${response.status})`);
   }
 
   return response.json();

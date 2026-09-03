@@ -1,32 +1,32 @@
 import React from 'react';
 import { 
-  ShieldCheck, 
-  Lock, 
-  Unlock, 
   BookOpen, 
   Sparkles, 
   TrendingUp, 
-  Compass, 
-  ShieldAlert, 
+  Settings,
+  ShieldCheck,
+  Lock, 
+  Unlock, 
   LogOut, 
   User as UserIcon,
-  CheckCircle2,
-  KeyRound,
-  Repeat
+  Sun,
+  Moon
 } from 'lucide-react';
 import { User } from '../lib/firebase';
 import { SecurityStatusReport } from '../types';
+import { useTheme } from '../lib/theme';
 
 interface NavigationHeaderProps {
   currentUser: User | null;
-  activeTab: 'journal' | 'reflections' | 'loops' | 'insights' | 'prompts' | 'security' | 'admin';
-  onTabChange: (tab: 'journal' | 'reflections' | 'loops' | 'insights' | 'prompts' | 'security' | 'admin') => void;
+  activeTab: 'journal' | 'gemini' | 'insights' | 'profile' | 'admin';
+  onTabChange: (tab: 'journal' | 'gemini' | 'insights' | 'profile' | 'admin') => void;
   onOpenAuth: () => void;
   onSignOut: () => void;
   isVaultLocked: boolean;
   onToggleVaultLock: () => void;
   hasPasskeyConfigured: boolean;
   securityStatus: SecurityStatusReport | null;
+  isAdminVerified?: boolean;
 }
 
 export const NavigationHeader: React.FC<NavigationHeaderProps> = ({
@@ -37,52 +37,70 @@ export const NavigationHeader: React.FC<NavigationHeaderProps> = ({
   onSignOut,
   isVaultLocked,
   onToggleVaultLock,
-  hasPasskeyConfigured,
-  securityStatus
+  hasPasskeyConfigured: _hasPasskeyConfigured,
+  securityStatus: _securityStatus,
+  isAdminVerified = false,
 }) => {
+  const { theme, toggleTheme, isDark } = useTheme();
+
   return (
-    <header className="sticky top-0 z-40 backdrop-blur-md bg-[#0a0a0a]/90 border-b border-[#262626] px-4 lg:px-8 py-3.5 transition-all">
-      <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4">
+    <header className="sticky top-0 z-40 backdrop-blur-md bg-surface-card/95 border-b border-theme px-4 lg:px-8 py-3 transition-colors shadow-xs">
+      <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-3 md:gap-4">
         
-        {/* Brand & Security Badge */}
-        <div className="flex items-center justify-between w-full md:w-auto gap-4">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-[#1a1a1a] border border-[#333333] flex items-center justify-center shadow-lg shadow-black/50">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#f27d26" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        {/* Brand & App Title */}
+        <div className="flex items-center justify-between w-full md:w-auto gap-3">
+          <div 
+            onClick={() => onTabChange('journal')}
+            className="flex items-center gap-3 cursor-pointer select-none"
+          >
+            <div className="w-9 h-9 rounded-xl bg-surface-secondary border border-theme flex items-center justify-center shadow-xs">
+              <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" className="text-accent" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
               </svg>
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <span className="font-display font-bold text-lg tracking-tight text-white">
-                  Mind<span className="text-[#f27d26]">Vault</span>
+                <span className="font-display font-bold text-base tracking-tight text-theme-primary">
+                  Mind<span className="text-accent">Vault</span>
                 </span>
-                <span className="text-[10px] uppercase font-mono tracking-widest px-2.5 py-0.5 rounded-full bg-[#1a1a1a] text-[#f27d26] border border-[#333333]">
-                  v2.5 AI
+                <span className="text-[10px] uppercase font-mono tracking-widest px-2 py-0.5 rounded-full bg-surface-secondary text-accent border border-accent/30 font-medium">
+                  Journal
                 </span>
               </div>
-              <p className="text-xs text-[#737373] font-serif-body italic">
-                Personal Gemini Journal • Cloud mindvault-507114
+              <p className="text-[11px] text-theme-muted font-serif-body italic">
+                Personal Gemini Journal
               </p>
             </div>
           </div>
 
-          {/* Mobile Auth Button */}
+          {/* Mobile Right Controls */}
           <div className="md:hidden flex items-center gap-2">
+            <button
+              id="mobile-theme-toggle-btn"
+              onClick={toggleTheme}
+              aria-label={`Switch to ${isDark ? 'light' : 'dark'} mode`}
+              className="p-2 rounded-xl bg-surface-secondary border border-theme text-theme-secondary hover:text-accent transition-colors flex items-center gap-1 text-xs font-mono"
+              title={`Switch to ${isDark ? 'Light' : 'Dark'} mode`}
+            >
+              {isDark ? <Sun className="w-4 h-4 text-amber-300" /> : <Moon className="w-4 h-4 text-theme-primary" />}
+            </button>
+
             {currentUser ? (
               <button 
                 id="mobile-user-profile-btn"
-                onClick={onSignOut}
-                className="p-2 rounded-xl bg-[#1a1a1a] border border-[#333333] text-[#d4d4d4] hover:text-[#e11d48]"
-                title="Sign out"
+                onClick={() => onTabChange('profile')}
+                className={`p-2 rounded-xl bg-surface-secondary border transition-colors ${
+                  activeTab === 'profile' ? 'border-accent text-accent' : 'border-theme text-theme-secondary'
+                }`}
+                title="Profile & Settings"
               >
-                <LogOut className="w-4 h-4" />
+                <Settings className="w-4 h-4" />
               </button>
             ) : (
               <button
                 id="mobile-signin-btn"
                 onClick={onOpenAuth}
-                className="px-3.5 py-1.5 rounded-xl bg-[#f27d26] text-[#0a0a0a] font-semibold text-xs shadow-md"
+                className="px-3 py-1.5 rounded-xl btn-primary-accent font-medium text-xs shadow-xs"
               >
                 Sign In
               </button>
@@ -90,156 +108,161 @@ export const NavigationHeader: React.FC<NavigationHeaderProps> = ({
           </div>
         </div>
 
-        {/* Navigation Tabs */}
-        <nav className="flex items-center gap-1 p-1 bg-[#121212] border border-[#262626] rounded-2xl overflow-x-auto max-w-full">
+        {/* Normal User Navigation: Exactly 4 Items (Journal, Gemini, Insights, Profile) */}
+        <nav className="flex items-center gap-1.5 p-1 bg-surface-secondary border border-theme rounded-2xl overflow-x-auto max-w-full">
           <button
             id="nav-tab-journal"
             onClick={() => onTabChange('journal')}
-            className={`flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-medium transition-all whitespace-nowrap ${
+            className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-medium transition-all whitespace-nowrap ${
               activeTab === 'journal'
-                ? 'bg-[#1a1a1a] text-white border border-[#333333] shadow-sm font-semibold'
-                : 'text-[#737373] hover:text-[#d4d4d4] hover:bg-[#1a1a1a]/50'
+                ? 'bg-surface-card text-theme-primary border border-theme shadow-xs font-semibold'
+                : 'text-theme-muted hover:text-theme-primary hover:bg-surface-card/50'
             }`}
           >
-            <BookOpen className="w-3.5 h-3.5 text-[#f27d26]" />
+            <BookOpen className="w-3.5 h-3.5 text-accent" />
             <span>Journal</span>
           </button>
 
           <button
-            id="nav-tab-reflections"
-            onClick={() => onTabChange('reflections')}
-            className={`flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-medium transition-all whitespace-nowrap ${
-              activeTab === 'reflections'
-                ? 'bg-[#1a1a1a] text-white border border-[#333333] shadow-sm font-semibold'
-                : 'text-[#737373] hover:text-[#d4d4d4] hover:bg-[#1a1a1a]/50'
+            id="nav-tab-gemini"
+            onClick={() => onTabChange('gemini')}
+            className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-medium transition-all whitespace-nowrap ${
+              activeTab === 'gemini'
+                ? 'bg-surface-card text-accent border border-accent/40 shadow-xs font-semibold'
+                : 'text-theme-muted hover:text-theme-primary hover:bg-surface-card/50'
             }`}
           >
-            <Sparkles className="w-3.5 h-3.5 text-[#f27d26]" />
-            <span>AI Reflections</span>
-          </button>
-
-          <button
-            id="nav-tab-loops"
-            onClick={() => onTabChange('loops')}
-            className={`flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-medium transition-all whitespace-nowrap ${
-              activeTab === 'loops'
-                ? 'bg-[#1a1a1a] text-[#f27d26] border border-[#f27d26]/40 shadow-sm font-semibold'
-                : 'text-[#737373] hover:text-[#d4d4d4] hover:bg-[#1a1a1a]/50'
-            }`}
-          >
-            <Repeat className="w-3.5 h-3.5 text-[#f27d26]" />
-            <span>Thought Loops</span>
+            <Sparkles className="w-3.5 h-3.5 text-accent" />
+            <span>Gemini</span>
           </button>
 
           <button
             id="nav-tab-insights"
             onClick={() => onTabChange('insights')}
-            className={`flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-medium transition-all whitespace-nowrap ${
+            className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-medium transition-all whitespace-nowrap ${
               activeTab === 'insights'
-                ? 'bg-[#1a1a1a] text-white border border-[#333333] shadow-sm font-semibold'
-                : 'text-[#737373] hover:text-[#d4d4d4] hover:bg-[#1a1a1a]/50'
+                ? 'bg-surface-card text-theme-primary border border-theme shadow-xs font-semibold'
+                : 'text-theme-muted hover:text-theme-primary hover:bg-surface-card/50'
             }`}
           >
-            <TrendingUp className="w-3.5 h-3.5 text-[#f27d26]" />
+            <TrendingUp className="w-3.5 h-3.5 text-accent" />
             <span>Insights</span>
           </button>
 
           <button
-            id="nav-tab-prompts"
-            onClick={() => onTabChange('prompts')}
-            className={`flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-medium transition-all whitespace-nowrap ${
-              activeTab === 'prompts'
-                ? 'bg-[#1a1a1a] text-white border border-[#333333] shadow-sm font-semibold'
-                : 'text-[#737373] hover:text-[#d4d4d4] hover:bg-[#1a1a1a]/50'
+            id="nav-tab-profile"
+            onClick={() => onTabChange('profile')}
+            className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-medium transition-all whitespace-nowrap ${
+              activeTab === 'profile'
+                ? 'bg-surface-card text-theme-primary border border-theme shadow-xs font-semibold'
+                : 'text-theme-muted hover:text-theme-primary hover:bg-surface-card/50'
             }`}
           >
-            <Compass className="w-3.5 h-3.5 text-[#f27d26]" />
-            <span>Prompts</span>
+            <Settings className="w-3.5 h-3.5 text-accent" />
+            <span>Profile</span>
           </button>
 
-          <button
-            id="nav-tab-security"
-            onClick={() => onTabChange('security')}
-            className={`flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-medium transition-all whitespace-nowrap ${
-              activeTab === 'security'
-                ? 'bg-[#1a1a1a] text-emerald-400 border border-emerald-500/40 shadow-sm font-semibold'
-                : 'text-[#737373] hover:text-emerald-400 hover:bg-[#1a1a1a]/50'
-            }`}
-          >
-            <div className="w-2 h-2 rounded-full bg-emerald-500"></div>
-            <span>Security Constitution</span>
-          </button>
-
-          <button
-            id="nav-tab-admin"
-            onClick={() => onTabChange('admin')}
-            className={`flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-medium transition-all whitespace-nowrap ${
-              activeTab === 'admin'
-                ? 'bg-[#1a1a1a] text-purple-300 border border-purple-500/50 shadow-sm font-semibold'
-                : 'text-[#737373] hover:text-purple-300 hover:bg-[#1a1a1a]/50'
-            }`}
-          >
-            <ShieldCheck className="w-3.5 h-3.5 text-purple-400" />
-            <span>Admin Telemetry</span>
-          </button>
+          {/* Admin Dashboard: STRICTLY visible only when user is the verified administrator barathsuresh19@gmail.com */}
+          {isAdminVerified && (
+            <button
+              id="nav-tab-admin"
+              onClick={() => onTabChange('admin')}
+              className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-medium transition-all whitespace-nowrap ${
+                activeTab === 'admin'
+                  ? 'bg-purple-950/40 text-purple-300 border border-purple-800/60 shadow-xs font-semibold'
+                  : 'text-purple-400 hover:text-purple-300 hover:bg-purple-950/20'
+              }`}
+            >
+              <ShieldCheck className="w-3.5 h-3.5 text-purple-400" />
+              <span>Admin</span>
+            </button>
+          )}
         </nav>
 
-        {/* Right Action: Vault Lock & User Profile */}
-        <div className="hidden md:flex items-center gap-3">
+        {/* Right Action: Theme Switcher, Vault Lock & User Profile */}
+        <div className="hidden md:flex items-center gap-2.5">
           
+          {/* Light / Dark Mode Toggle Switch */}
+          <div className="flex items-center bg-surface-secondary border border-theme rounded-xl p-0.5">
+            <button
+              id="theme-switch-light"
+              onClick={() => theme !== 'light' && toggleTheme()}
+              aria-label="Switch to Light mode"
+              className={`flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium transition-all ${
+                !isDark 
+                  ? 'bg-surface-card text-theme-primary shadow-xs font-semibold' 
+                  : 'text-theme-muted hover:text-theme-primary'
+              }`}
+              title="Light mode"
+            >
+              <Sun className="w-3.5 h-3.5 text-amber-500" />
+              <span>Light</span>
+            </button>
+            <button
+              id="theme-switch-dark"
+              onClick={() => theme !== 'dark' && toggleTheme()}
+              aria-label="Switch to Dark mode"
+              className={`flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium transition-all ${
+                isDark 
+                  ? 'bg-surface-card text-theme-primary shadow-xs font-semibold' 
+                  : 'text-theme-muted hover:text-theme-primary'
+              }`}
+              title="Dark mode"
+            >
+              <Moon className="w-3.5 h-3.5 text-teal-300" />
+              <span>Dark</span>
+            </button>
+          </div>
+
           {/* Client Vault Lock Toggle */}
           <button
             id="header-vault-lock-btn"
             onClick={onToggleVaultLock}
-            className={`flex items-center gap-2 px-3.5 py-1.5 rounded-xl border text-xs font-medium transition-all ${
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-medium transition-all ${
               isVaultLocked
-                ? 'bg-[#1a1a1a] border-[#e11d48]/50 text-[#e11d48] hover:bg-[#262626]'
-                : 'bg-[#121212] border-[#262626] text-[#a3a3a3] hover:text-white hover:border-[#333333]'
+                ? 'bg-rose-500/10 border-rose-500/30 text-rose-600 dark:text-rose-400 hover:bg-rose-500/20'
+                : 'bg-surface-secondary border-theme text-theme-secondary hover:text-theme-primary hover:border-accent/40'
             }`}
             title={isVaultLocked ? "Vault is Locked. Click to unlock with passkey." : "Vault is Unlocked. Click to lock sensitive entries."}
           >
             {isVaultLocked ? (
               <>
-                <Lock className="w-3.5 h-3.5 text-[#e11d48]" />
-                <span>Vault Locked</span>
+                <Lock className="w-3.5 h-3.5 text-rose-500" />
+                <span>Locked</span>
               </>
             ) : (
               <>
-                <Unlock className="w-3.5 h-3.5 text-emerald-400" />
-                <span>Vault Open</span>
+                <Unlock className="w-3.5 h-3.5 text-emerald-500" />
+                <span>Unlocked</span>
               </>
             )}
           </button>
 
           {/* User Profile / Auth Status */}
           {currentUser ? (
-            <div className="flex items-center gap-2.5 pl-2 border-l border-[#262626]">
-              <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[#f27d26] to-[#e11d48] flex items-center justify-center text-white text-xs font-bold shadow-md">
+            <div 
+              onClick={() => onTabChange('profile')}
+              className="flex items-center gap-2 pl-2 border-l border-theme cursor-pointer group"
+              title="View Profile & Settings"
+            >
+              <div className="w-8 h-8 rounded-full bg-accent text-white flex items-center justify-center text-xs font-bold shadow-xs group-hover:opacity-90">
                 {(currentUser.displayName || currentUser.email || 'U').charAt(0).toUpperCase()}
               </div>
               <div className="flex flex-col text-right">
-                <span className="text-xs font-medium text-white max-w-[130px] truncate">
-                  {currentUser.displayName || currentUser.email?.split('@')[0] || (currentUser.isAnonymous ? 'Guest User' : 'Authenticated')}
+                <span className="text-xs font-medium text-theme-primary max-w-[120px] truncate group-hover:text-accent transition-colors">
+                  {currentUser.displayName || currentUser.email?.split('@')[0] || (currentUser.isAnonymous ? 'Guest' : 'User')}
                 </span>
-                <span className="text-[10px] font-mono text-emerald-400 flex items-center justify-end gap-1">
+                <span className="text-[10px] font-mono text-emerald-600 dark:text-emerald-400 flex items-center justify-end gap-1">
                   <div className="w-1.5 h-1.5 rounded-full bg-emerald-500"></div>
-                  Firebase Auth
+                  Online
                 </span>
               </div>
-              <button
-                id="header-signout-btn"
-                onClick={onSignOut}
-                className="p-2 rounded-xl bg-[#121212] hover:bg-[#1a1a1a] border border-[#262626] hover:border-[#333333] text-[#737373] hover:text-[#e11d48] transition-colors"
-                title="Sign Out"
-              >
-                <LogOut className="w-4 h-4" />
-              </button>
             </div>
           ) : (
             <button
               id="header-signin-btn"
               onClick={onOpenAuth}
-              className="flex items-center gap-2 px-4 py-1.5 rounded-xl bg-[#f27d26] hover:bg-[#e06b16] text-[#0a0a0a] font-semibold text-xs shadow-md transition-all"
+              className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl btn-primary-accent font-medium text-xs shadow-xs transition-all"
             >
               <UserIcon className="w-3.5 h-3.5" />
               <span>Sign In</span>

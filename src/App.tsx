@@ -3,7 +3,7 @@ import {
   auth, 
   onAuthStateChanged, 
   User, 
-  firebaseSignOut 
+  firebaseSignOut
 } from './lib/firebase';
 import { 
   subscribeToEntries, 
@@ -19,38 +19,34 @@ import { MOOD_PRESETS } from './lib/constants';
 import { NavigationHeader } from './components/NavigationHeader';
 import { JournalEditor } from './components/JournalEditor';
 import { EntryCard } from './components/EntryCard';
-import { AIReflectionCard } from './components/AIReflectionCard';
+import { DailyThoughtCard } from './components/DailyThoughtCard';
+import { GeminiCompanionView } from './components/GeminiCompanionView';
+import { ProfileSettingsView } from './components/ProfileSettingsView';
 import { InsightsDashboard } from './components/InsightsDashboard';
-import { GuidedPromptsView } from './components/GuidedPromptsView';
-import { ThoughtLoopDetectorView } from './components/ThoughtLoopDetectorView';
-import { SecurityConstitutionModal } from './components/SecurityConstitutionModal';
 import { AdminDashboardView } from './components/AdminDashboardView';
 import { AuthModal } from './components/AuthModal';
 import { PasskeyModal } from './components/PasskeyModal';
+import { WelcomeLandingPage } from './components/WelcomeLandingPage';
 import { fetchSecurityStatus } from './lib/geminiApi';
 import { 
   BookOpen, 
-  Plus, 
   Search, 
-  Filter, 
   Sparkles, 
-  ShieldCheck, 
-  Lock, 
-  Unlock, 
-  KeyRound, 
-  AlertCircle,
   FolderLock,
-  Repeat
+  ArrowRight,
+  MessageSquare,
+  TrendingUp
 } from 'lucide-react';
 
 export default function App() {
   // Authentication State
   const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [isAdminVerified, setIsAdminVerified] = useState<boolean>(false);
   const [authLoading, setAuthLoading] = useState(true);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
 
-  // Active View Tab
-  const [activeTab, setActiveTab] = useState<'journal' | 'reflections' | 'loops' | 'insights' | 'prompts' | 'security' | 'admin'>('journal');
+  // Active View Tab: Normal users see only journal, gemini, insights, profile
+  const [activeTab, setActiveTab] = useState<'journal' | 'gemini' | 'insights' | 'profile' | 'admin'>('journal');
 
   // Journal & Audit State
   const [entries, setEntries] = useState<JournalEntry[]>([]);
@@ -58,6 +54,10 @@ export default function App() {
   const [editingEntry, setEditingEntry] = useState<JournalEntry | null>(null);
   const [showEditor, setShowEditor] = useState(true);
   const [prefilledPrompt, setPrefilledPrompt] = useState<string | null>(null);
+
+  // Gemini Companion State
+  const [geminiFocusedEntry, setGeminiFocusedEntry] = useState<JournalEntry | null>(null);
+  const [geminiInitialPrompt, setGeminiInitialPrompt] = useState<string | null>(null);
 
   // Search & Filter State
   const [searchQuery, setSearchQuery] = useState('');
@@ -72,51 +72,88 @@ export default function App() {
   // Security backend health
   const [securityStatus, setSecurityStatus] = useState<SecurityStatusReport | null>(null);
 
-  // Listen to Firebase Auth state
+  // Listen to Firebase Auth state & verify custom claims strictly for barathsuresh19@gmail.com
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
       setCurrentUser(user);
       setAuthLoading(false);
       if (user) {
         ensureUserDocument(user.uid, user.email, user.displayName);
-        fetchSecurityStatus().then(setSecurityStatus).catch(() => {});
+        recordAuditLog(user.uid, "SESSION_START", "SUCCESS", `Auth session active for ${user.email || user.uid}`, "FIREBASE_AUTH");
+        try {
+          // Cryptographically verified token result from Firebase Auth
+          const tokenResult = await user.getIdTokenResult();
+          const isDesignatedEmail = (user.email || "").toLowerCase().trim() === "barathsuresh19@gmail.com";
+          const hasAdminClaim = tokenResult.claims.admin === true;
+          // UX helper only; real authorization boundary is strictly enforced on the backend
+          setIsAdminVerified(isDesignatedEmail && hasAdminClaim);
+        } catch {
+          setIsAdminVerified(false);
+        }
       } else {
-        setEntries([]);
-        setAuditLogs([]);
+        setIsAdminVerified(false);
       }
     });
     return () => unsubscribe();
   }, []);
 
-  // Listen to Firestore real-time subscriptions when user changes
+  // UX Guard: Normal users without verified admin claim cannot navigate to admin tab
   useEffect(() => {
-    if (!currentUser) return;
+    if (activeTab === 'admin' && !isAdminVerified && !authLoading) {
+      setActiveTab('journal');
+    }
+  }, [activeTab, isAdminVerified, authLoading]);
 
-    const unsubEntries = subscribeToEntries(
+  // Fetch security status report
+  useEffect(() => {
+    fetchSecurityStatus()
+      .then((status) => setSecurityStatus(status))
+      .catch((err) => console.warn("Could not fetch security status:", err));
+  }, []);
+
+  // Subscribe to Firestore isolated entries when user is authenticated
+  useEffect(() => {
+    if (!currentUser) {
+      setEntries([]);
+      setAuditLogs([]);
+      return;
+    }
+
+    const unsubscribeEntries = subscribeToEntries(
       currentUser.uid,
-      (newEntries) => setEntries(newEntries),
-      (err) => console.warn("Entries subscription warning:", err)
+      (loadedEntries) => {
+        setEntries(loadedEntries);
+      },
+      (error) => {
+        console.error("Failed to subscribe to user entries:", error);
+      }
     );
 
-    const unsubLogs = subscribeToAuditLogs(
+    const unsubscribeAudit = subscribeToAuditLogs(
       currentUser.uid,
-      (newLogs) => setAuditLogs(newLogs)
+      (loadedLogs) => {
+        setAuditLogs(loadedLogs);
+      }
     );
 
     return () => {
-      unsubEntries();
-      unsubLogs();
+      unsubscribeEntries();
+      unsubscribeAudit();
     };
   }, [currentUser]);
 
   // Sign out handler
   const handleSignOut = async () => {
     if (currentUser) {
-      await recordAuditLog(currentUser.uid, "AUTH_SIGNOUT", "SUCCESS", "User session ended cleanly", "FIREBASE_AUTH");
+      await recordAuditLog(currentUser.uid, "USER_SIGNOUT", "SUCCESS", "User terminated session", "FIREBASE_AUTH");
     }
     await firebaseSignOut(auth);
+    setCurrentUser(null);
+    setIsAdminVerified(false);
     setVaultPasskey(null);
-    setIsVaultLocked(true);
+    setIsVaultLocked(false);
+    setEntries([]);
+    setEditingEntry(null);
   };
 
   // Toggle Vault Lock
@@ -138,19 +175,22 @@ export default function App() {
   };
 
   // Save or Update Entry
-  const handleSaveEntry = async (entryData: Omit<JournalEntry, 'id' | 'userId' | 'createdAt' | 'updatedAt'>) => {
+  const handleSaveEntry = async (entryData: Omit<JournalEntry, 'id' | 'userId' | 'createdAt' | 'updatedAt'>): Promise<string | void> => {
     if (!currentUser) {
       setIsAuthModalOpen(true);
       return;
     }
 
+    let savedId: string | void;
     if (editingEntry) {
       await updateJournalEntry(currentUser.uid, editingEntry.id, entryData);
+      savedId = editingEntry.id;
       setEditingEntry(null);
     } else {
-      await saveJournalEntry(currentUser.uid, entryData);
+      savedId = await saveJournalEntry(currentUser.uid, entryData);
     }
     setPrefilledPrompt(null);
+    return savedId;
   };
 
   // Delete Entry
@@ -190,18 +230,44 @@ export default function App() {
     return matchesSearch && matchesMood && matchesTag;
   });
 
-  // Extract all distinct tags from user's entries
-  const allUserTags = Array.from(
-    new Set(entries.flatMap(e => e.tags || []))
-  );
+  // Extract all unique user tags
+  const allUserTags = Array.from(new Set(entries.flatMap((e) => e.tags || [])));
 
-  // Entries with reflections for Reflections Tab
-  const entriesWithReflections = entries.filter(e => !!e.aiReflection);
+  // Count AI reflections
+  const entriesWithReflections = entries.filter((e) => !!e.aiReflection);
+
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-[#090c0e] text-white flex flex-col items-center justify-center font-sans">
+        <div className="w-12 h-12 rounded-2xl bg-[#11171a] border border-[#232f36] flex items-center justify-center text-[#48ab9e] shadow-[0_0_24px_rgba(72,171,158,0.2)] animate-pulse">
+          <BookOpen className="w-6 h-6" />
+        </div>
+        <p className="mt-4 font-display font-semibold tracking-widest uppercase text-xs text-[#7c827d]">
+          MindVault
+        </p>
+      </div>
+    );
+  }
+
+  // Unauthenticated visitors see the dedicated Welcome / Home landing page
+  if (!currentUser) {
+    return (
+      <>
+        <WelcomeLandingPage
+          onOpenAuth={() => setIsAuthModalOpen(true)}
+        />
+        <AuthModal
+          isOpen={isAuthModalOpen}
+          onClose={() => setIsAuthModalOpen(false)}
+        />
+      </>
+    );
+  }
 
   return (
-    <div className="min-h-screen bg-[#0a0a0a] text-[#d4d4d4] flex flex-col font-sans selection:bg-[#f27d26]/30 selection:text-[#f27d26]">
+    <div className="min-h-screen bg-canvas text-theme-primary flex flex-col font-sans transition-colors">
       
-      {/* Top Header */}
+      {/* Top Header with Light/Dark Mode Switcher */}
       <NavigationHeader
         currentUser={currentUser}
         activeTab={activeTab}
@@ -215,56 +281,38 @@ export default function App() {
         onToggleVaultLock={handleToggleVaultLock}
         hasPasskeyConfigured={!!vaultPasskey}
         securityStatus={securityStatus}
+        isAdminVerified={isAdminVerified}
       />
 
       {/* Main Content Area */}
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 lg:px-8 py-6 md:py-8">
         
-        {/* Unauthenticated Security Callout Banner */}
-        {!currentUser && !authLoading && (
-          <div className="mb-8 p-6 md:p-8 rounded-3xl bg-[#121212] border border-[#262626] shadow-2xl relative overflow-hidden flex flex-col md:flex-row items-center justify-between gap-6">
-            <div className="space-y-2 z-10 max-w-2xl">
-              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#1a1a1a] border border-[#333333] text-[#f27d26] text-xs font-mono">
-                <div className="w-2 h-2 rounded-full bg-green-500"></div>
-                <span>Zero-Trust Architecture • Google Cloud mindvault-507114</span>
-              </div>
-              <h1 className="font-display font-bold text-2xl md:text-3xl text-white">
-                MindVault: Personal Gemini Journal
-              </h1>
-              <p className="text-xs md:text-sm text-[#a3a3a3] font-serif-body leading-relaxed">
-                Experience confidential self-reflection with server-isolated Gemini AI, zero-knowledge client vaults, and database security rules strictly locking data to your authenticated UID.
-              </p>
-            </div>
-
-            <div className="flex flex-col sm:flex-row gap-3 z-10 shrink-0 w-full md:w-auto">
-              <button
-                id="landing-signin-btn"
-                onClick={() => setIsAuthModalOpen(true)}
-                className="px-6 py-3 rounded-xl bg-[#f27d26] hover:bg-[#e06b16] text-[#0a0a0a] font-bold text-xs md:text-sm shadow-xl transition-all text-center cursor-pointer"
-              >
-                Sign In / Open Vault
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* TAB 1: JOURNAL (Editor + Timeline) */}
+        {/* TAB 1: JOURNAL (Daily Thought + Editor + Timeline + Quick Actions) */}
         {activeTab === 'journal' && (
           <div className="space-y-8 animate-fade-in">
             
-            {/* Editor Container */}
+            {/* 1. Today's Thought / Positive Reflection Card */}
+            <DailyThoughtCard
+              onTalkToGemini={(prompt) => {
+                setGeminiInitialPrompt(prompt);
+                setGeminiFocusedEntry(null);
+                setActiveTab('gemini');
+              }}
+            />
+
+            {/* 2. Editor Container */}
             {showEditor && currentUser && (
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
-                  <h2 className="font-display font-bold text-base text-white uppercase tracking-wider flex items-center gap-2">
-                    <BookOpen className="w-4 h-4 text-[#f27d26]" />
+                  <h2 className="font-display font-bold text-base text-theme-primary uppercase tracking-wider flex items-center gap-2">
+                    <BookOpen className="w-4 h-4 text-accent" />
                     <span>{editingEntry ? 'Editing MindVault Entry' : 'Daily Introspection & Reflection'}</span>
                   </h2>
 
                   {editingEntry && (
                     <button
                       onClick={() => setEditingEntry(null)}
-                      className="text-xs text-[#a3a3a3] hover:text-[#f27d26] underline transition-colors"
+                      className="text-xs text-theme-muted hover:text-accent underline transition-colors"
                     >
                       + Write New Entry Instead
                     </button>
@@ -279,23 +327,31 @@ export default function App() {
                   vaultPasskey={vaultPasskey}
                   onOpenPasskeyModal={() => setIsPasskeyModalOpen(true)}
                   defaultPrompt={prefilledPrompt}
+                  onTalkToGeminiEntry={(savedEntry) => {
+                    setGeminiFocusedEntry(savedEntry);
+                    setGeminiInitialPrompt(null);
+                    setActiveTab('gemini');
+                  }}
+                  onNavigateToGemini={() => {
+                    setActiveTab('gemini');
+                  }}
                 />
               </div>
             )}
 
-            {/* Filter & Search Bar */}
-            <div className="bg-[#121212] border border-[#262626] rounded-2xl p-4 md:p-5 shadow-lg flex flex-col md:flex-row items-center justify-between gap-3">
+            {/* 3. Filter & Search Bar */}
+            <div className="bg-surface-card border border-theme rounded-2xl p-4 md:p-5 shadow-xs flex flex-col md:flex-row items-center justify-between gap-3">
               
               {/* Search Box */}
               <div className="relative w-full md:w-72">
-                <Search className="w-4 h-4 absolute left-3.5 top-3 text-[#737373]" />
+                <Search className="w-4 h-4 absolute left-3.5 top-3 text-theme-muted" />
                 <input
                   id="journal-search-input"
                   type="text"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Search thoughts, tags, reflections..."
-                  className="w-full bg-[#0a0a0a] border border-[#262626] rounded-xl pl-10 pr-4 py-2 text-xs text-[#d4d4d4] placeholder-[#525252] focus:outline-none focus:border-[#f27d26]/60 transition-colors"
+                  placeholder="Search thoughts, memories, tags..."
+                  className="w-full bg-surface-secondary border border-theme rounded-xl pl-10 pr-4 py-2 text-xs text-theme-primary placeholder-theme-muted focus:outline-none focus:border-accent transition-colors"
                 />
               </div>
 
@@ -307,7 +363,7 @@ export default function App() {
                   id="journal-mood-filter-select"
                   value={filterMood}
                   onChange={(e) => setFilterMood(e.target.value)}
-                  className="text-xs bg-[#0a0a0a] border border-[#262626] text-[#d4d4d4] rounded-xl px-3 py-2 focus:outline-none focus:border-[#f27d26]/60"
+                  className="text-xs bg-surface-secondary border border-theme text-theme-primary rounded-xl px-3 py-2 focus:outline-none focus:border-accent cursor-pointer"
                 >
                   <option value="all">All Moods ({entries.length})</option>
                   {MOOD_PRESETS.map((m) => (
@@ -323,7 +379,7 @@ export default function App() {
                     id="journal-tag-filter-select"
                     value={filterTag}
                     onChange={(e) => setFilterTag(e.target.value)}
-                    className="text-xs bg-[#0a0a0a] border border-[#262626] text-[#d4d4d4] rounded-xl px-3 py-2 focus:outline-none focus:border-[#f27d26]/60"
+                    className="text-xs bg-surface-secondary border border-theme text-theme-primary rounded-xl px-3 py-2 focus:outline-none focus:border-accent cursor-pointer"
                   >
                     <option value="all">All Tags</option>
                     {allUserTags.map((t) => (
@@ -340,7 +396,7 @@ export default function App() {
                       setFilterMood('all');
                       setFilterTag('all');
                     }}
-                    className="text-xs text-[#737373] hover:text-[#f27d26] px-2 py-1 underline font-mono transition-colors"
+                    className="text-xs text-theme-muted hover:text-accent px-2 py-1 underline font-mono transition-colors"
                   >
                     Reset
                   </button>
@@ -349,15 +405,15 @@ export default function App() {
               </div>
             </div>
 
-            {/* Timeline Entries List */}
+            {/* 4. Timeline Entries List */}
             <div className="space-y-4">
               <div className="flex items-center justify-between px-1">
-                <span className="text-xs font-semibold text-[#737373] uppercase tracking-widest font-mono">
+                <span className="text-xs font-semibold text-theme-muted uppercase tracking-widest font-mono">
                   Isolated Journal Timeline ({filteredEntries.length} {filteredEntries.length === 1 ? 'entry' : 'entries'})
                 </span>
 
                 {currentUser && (
-                  <span className="text-[11px] font-mono text-emerald-400 flex items-center gap-1.5">
+                  <span className="text-[11px] font-mono text-emerald-600 dark:text-emerald-400 flex items-center gap-1.5">
                     <div className="w-1.5 h-1.5 rounded-full bg-emerald-500"></div>
                     Scoped: /users/{currentUser.uid.slice(0, 6)}...
                   </span>
@@ -365,16 +421,16 @@ export default function App() {
               </div>
 
               {filteredEntries.length === 0 ? (
-                <div className="bg-[#121212]/50 border border-dashed border-[#262626] rounded-3xl p-12 text-center space-y-3">
-                  <div className="w-12 h-12 mx-auto rounded-xl bg-[#1a1a1a] border border-[#333333] flex items-center justify-center text-[#737373]">
-                    <FolderLock className="w-6 h-6 text-[#f27d26]" />
+                <div className="bg-surface-card border border-dashed border-theme rounded-3xl p-12 text-center space-y-3">
+                  <div className="w-12 h-12 mx-auto rounded-xl bg-surface-secondary border border-theme flex items-center justify-center text-theme-muted">
+                    <FolderLock className="w-6 h-6 text-accent" />
                   </div>
-                  <h3 className="font-display font-semibold text-base text-white">
+                  <h3 className="font-display font-semibold text-base text-theme-primary">
                     {entries.length === 0 ? 'Your MindVault is Empty' : 'No matching entries found'}
                   </h3>
-                  <p className="text-xs text-[#737373] font-serif-body max-w-sm mx-auto">
+                  <p className="text-xs text-theme-secondary font-serif-body max-w-sm mx-auto">
                     {entries.length === 0 
-                      ? 'Begin your personal journey by capturing your current state of mind above.' 
+                      ? 'Begin your personal journey by capturing your current state of mind and photos above.' 
                       : 'Try adjusting your search terms or filter criteria.'}
                   </p>
                 </div>
@@ -391,120 +447,123 @@ export default function App() {
                     onOpenPasskeyModal={() => setIsPasskeyModalOpen(true)}
                     onSelectInquiryQuestion={handleSelectPrompt}
                     onRequestReflection={handleStartEdit}
+                    onTalkToGemini={(entryToDiscuss) => {
+                      setGeminiFocusedEntry(entryToDiscuss);
+                      setGeminiInitialPrompt(null);
+                      setActiveTab('gemini');
+                    }}
                   />
                 ))
               )}
             </div>
 
-          </div>
-        )}
-
-        {/* TAB 2: AI REFLECTIONS STREAM */}
-        {activeTab === 'reflections' && (
-          <div className="space-y-6 animate-fade-in max-w-5xl mx-auto">
-            <div className="bg-[#121212] border border-[#262626] rounded-3xl p-6 shadow-xl flex items-center justify-between">
-              <div>
-                <h2 className="font-display font-bold text-xl text-white flex items-center gap-2">
-                  <Sparkles className="w-5 h-5 text-[#f27d26]" />
-                  <span>Gemini Cognitive Reflections</span>
-                </h2>
-                <p className="text-xs text-[#a3a3a3] font-serif-body mt-1">
-                  Synthesized cognitive reframes, inquiry prompts, and interactive dialogue threads across your entries.
+            {/* 5. Quick Access to Gemini & Subtle Insights Preview */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4">
+              <div 
+                id="home-talk-gemini-card"
+                onClick={() => {
+                  setGeminiFocusedEntry(null);
+                  setGeminiInitialPrompt(null);
+                  setActiveTab('gemini');
+                }}
+                className="p-5 rounded-3xl bg-surface-card hover:bg-surface-secondary border border-theme hover:border-accent/40 transition-all cursor-pointer group shadow-xs space-y-2"
+              >
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <div className="w-8 h-8 rounded-xl bg-accent/10 flex items-center justify-center text-accent">
+                      <Sparkles className="w-4 h-4" />
+                    </div>
+                    <span className="text-xs font-semibold text-theme-primary">Talk with Gemini</span>
+                  </div>
+                  <ArrowRight className="w-4 h-4 text-theme-muted group-hover:text-accent group-hover:translate-x-0.5 transition-all" />
+                </div>
+                <p className="text-xs text-theme-secondary font-serif-body">
+                  Discuss recent feelings, explore recurring thoughts, or unpack your day in a private, supportive dialogue.
                 </p>
               </div>
 
-              <span className="text-xs font-mono bg-[#1a1a1a] text-[#f27d26] px-3.5 py-1.5 rounded-full border border-[#333333]">
-                {entriesWithReflections.length} Reflections
-              </span>
+              <div 
+                id="home-insights-preview-card"
+                onClick={() => setActiveTab('insights')}
+                className="p-5 rounded-3xl bg-surface-card hover:bg-surface-secondary border border-theme hover:border-accent/40 transition-all cursor-pointer group shadow-xs space-y-2"
+              >
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <div className="w-8 h-8 rounded-xl bg-emerald-500/10 flex items-center justify-center text-emerald-500">
+                      <TrendingUp className="w-4 h-4" />
+                    </div>
+                    <span className="text-xs font-semibold text-theme-primary">Emotional Trends & Patterns</span>
+                  </div>
+                  <ArrowRight className="w-4 h-4 text-theme-muted group-hover:text-emerald-500 group-hover:translate-x-0.5 transition-all" />
+                </div>
+                <p className="text-xs text-theme-secondary font-serif-body">
+                  {entries.length > 0 
+                    ? `View your mood trajectory across ${entries.length} ${entries.length === 1 ? 'entry' : 'entries'}, cognitive tags, and temporal consistency.` 
+                    : 'Track your mood trajectories, cognitive tags, and personal growth trends over time.'}
+                </p>
+              </div>
             </div>
 
-            {entriesWithReflections.length === 0 ? (
-              <div className="bg-[#121212]/50 border border-dashed border-[#262626] rounded-3xl p-12 text-center space-y-3">
-                <Sparkles className="w-8 h-8 mx-auto text-[#525252]" />
-                <h3 className="font-display font-semibold text-base text-white">
-                  No AI Reflections Generated Yet
-                </h3>
-                <p className="text-xs text-[#737373] font-serif-body max-w-sm mx-auto">
-                  Write or edit any journal entry and click "Reflect with Gemini" to generate deep, multi-perspective psychological reflections.
-                </p>
-              </div>
-            ) : (
-              entriesWithReflections.map((entry) => (
-                <div key={entry.id} className="space-y-2">
-                  <div className="flex items-center justify-between px-2 text-xs text-[#737373] font-mono">
-                    <span className="font-bold text-[#d4d4d4]">{entry.title}</span>
-                    <span>{new Date(entry.createdAt).toLocaleDateString()}</span>
-                  </div>
-                  <AIReflectionCard
-                    reflection={entry.aiReflection!}
-                    entryContent={entry.content}
-                    onSelectInquiryQuestion={handleSelectPrompt}
-                    savedChatHistory={entry.aiChatHistory || []}
-                    onSaveChatHistory={(chat) => {
-                      if (currentUser) {
-                        updateJournalEntry(currentUser.uid, entry.id, { aiChatHistory: chat });
-                      }
-                    }}
-                  />
-                </div>
-              ))
-            )}
           </div>
         )}
 
-        {/* TAB 3: THOUGHT LOOP DETECTOR (ORIGINAL FEATURE) */}
-        {activeTab === 'loops' && (
-          <ThoughtLoopDetectorView
-            entries={entries}
-            onSelectPrompt={handleSelectPrompt}
-            onGoToJournal={() => setActiveTab('journal')}
-            userId={currentUser?.uid}
-          />
+        {/* TAB 2: GEMINI COMPANION VIEW */}
+        {activeTab === 'gemini' && (
+          <div className="animate-fade-in">
+            <GeminiCompanionView
+              userId={currentUser?.uid}
+              entries={entries}
+              focusedEntry={geminiFocusedEntry}
+              initialPrompt={geminiInitialPrompt}
+              onClearFocusedEntry={() => setGeminiFocusedEntry(null)}
+            />
+          </div>
         )}
 
-        {/* TAB 4: INSIGHTS & ANALYTICS */}
+        {/* TAB 3: INSIGHTS & ANALYTICS */}
         {activeTab === 'insights' && (
-          <InsightsDashboard entries={entries} />
+          <div className="animate-fade-in">
+            <InsightsDashboard entries={entries} />
+          </div>
         )}
 
-        {/* TAB 4: GUIDED PROMPTS */}
-        {activeTab === 'prompts' && (
-          <GuidedPromptsView
-            entries={entries}
-            onSelectPrompt={handleSelectPrompt}
-          />
+        {/* TAB 4: PROFILE & SETTINGS */}
+        {activeTab === 'profile' && (
+          <div className="animate-fade-in">
+            <ProfileSettingsView
+              currentUser={currentUser}
+              entries={entries}
+              isVaultLocked={isVaultLocked}
+              onToggleVaultLock={handleToggleVaultLock}
+              hasPasskeyConfigured={!!vaultPasskey}
+              onOpenPasskeyModal={() => setIsPasskeyModalOpen(true)}
+              onSignOut={handleSignOut}
+              securityStatus={securityStatus}
+              onOpenAdminDashboard={() => setActiveTab('admin')}
+              isAdminVerified={isAdminVerified}
+            />
+          </div>
         )}
 
-        {/* TAB 5: SECURITY CONSTITUTION INSPECTOR */}
-        {activeTab === 'security' && (
-          <SecurityConstitutionModal
-            userId={currentUser?.uid || ''}
-            auditLogs={auditLogs}
-            entries={entries}
-            onDataWiped={() => {
-              setEntries([]);
-              setAuditLogs([]);
-            }}
-          />
-        )}
-
-        {/* TAB 6: ADMIN & RBAC DASHBOARD */}
+        {/* TAB 5: ADMIN & RBAC DASHBOARD (Protected server-side by requireAdmin) */}
         {activeTab === 'admin' && (
-          <AdminDashboardView
-            currentUserEmail={currentUser?.email || undefined}
-            onGoToJournal={() => setActiveTab('journal')}
-          />
+          <div className="animate-fade-in">
+            <AdminDashboardView
+              currentUserEmail={currentUser?.email || undefined}
+              onGoToJournal={() => setActiveTab('journal')}
+            />
+          </div>
         )}
 
       </main>
 
       {/* Footer */}
-      <footer className="mt-auto border-t border-[#262626] bg-[#0a0a0a] py-6 px-4 text-center text-xs text-[#525252] font-mono space-y-1">
+      <footer className="mt-auto border-t border-theme bg-surface-card py-6 px-4 text-center text-xs text-theme-muted font-mono space-y-1 transition-colors">
         <p>
-          System: <span className="text-[#f27d26]">mindvault-507114</span> • Region: <span className="text-[#737373]">us-central1</span> • Database: <span className="text-[#737373]">ai-studio-5307edf2-554e-46d5-8531-ff81d7300d1c</span>
+          System: <span className="text-accent font-medium">mindvault-507114</span> • Database: <span className="text-theme-secondary">ai-studio-5307edf2-554e-46d5-8531-ff81d7300d1c</span>
         </p>
-        <p className="text-[11px] text-[#525252] font-serif-body italic">
-          Zero-Trust Security Constitution Enforced • Encrypted via Secret Manager & AES-GCM Client Vaults
+        <p className="text-[11px] text-theme-muted font-serif-body italic">
+          Zero-Trust Security Constitution Enforced • Verified Firebase UID Isolation • Client AES-GCM Storage
         </p>
       </footer>
 
