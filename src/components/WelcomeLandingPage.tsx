@@ -137,7 +137,7 @@ export const WelcomeLandingPage: React.FC<WelcomeLandingPageProps> = ({ onOpenAu
           <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-[#11181c]/90 border border-[#22323a] text-xs text-[#9ea8a5] shadow-xs">
             <span className="w-1.5 h-1.5 rounded-full bg-[#48ab9e] animate-pulse" />
             <span className="font-mono tracking-wider uppercase text-[11px] text-[#48ab9e]">
-              Private • AI-Assisted • Zero-Trust
+              Private • AI-Assisted 
             </span>
           </div>
 
