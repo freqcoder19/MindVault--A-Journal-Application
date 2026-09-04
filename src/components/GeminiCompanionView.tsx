@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { JournalEntry, ThoughtLoopAnalysis, AIChatMessage } from '../types';
 import { sendGeminiCompanionChat, fetchThoughtLoops } from '../lib/geminiApi';
+import { extractPlainText } from '../lib/richText';
 
 interface GeminiCompanionViewProps {
   userId?: string;
@@ -129,7 +130,7 @@ export const GeminiCompanionView: React.FC<GeminiCompanionViewProps> = ({
         currentMessage: text,
         history: messages.slice(-8).map(m => ({ role: m.role, content: m.content })),
         entryId: focusedEntry?.id,
-        entryContent: focusedEntry?.content
+        entryContent: focusedEntry?.content ? extractPlainText(focusedEntry.content) : undefined
       });
 
       const assistantMsg: AIChatMessage = {

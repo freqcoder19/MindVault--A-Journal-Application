@@ -24,6 +24,8 @@ import { encryptText, sanitizeInput } from '../lib/security';
 import { recordAuditLog } from '../lib/journalService';
 import { uploadJournalMemoryPhoto, validateImageFile, MAX_IMAGES_PER_ENTRY } from '../lib/storageService';
 import { ImagePreviewModal } from './ImagePreviewModal';
+import { RichTextEditor } from './RichTextEditor';
+import { sanitizeHtml, extractPlainText, calculateWordCount, isContentEmpty } from '../lib/richText';
 
 interface JournalEditorProps {
   userId: string;
@@ -228,8 +230,9 @@ export const JournalEditor: React.FC<JournalEditorProps> = ({
 
   // Trigger Gemini Reflection (Operates strictly on text/context, never automatically sends photos)
   const handleGenerateReflection = async () => {
-    const cleanContent = sanitizeInput(content);
-    if (!cleanContent) {
+    // Provide Gemini with clean readable text rather than raw HTML formatting tags
+    const readableText = extractPlainText(content);
+    if (!readableText) {
       setAiError("Please write some journal thoughts before requesting an AI reflection.");
       return;
     }
@@ -239,7 +242,7 @@ export const JournalEditor: React.FC<JournalEditorProps> = ({
 
     try {
       const reflection = await requestAIReflection({
-        content: cleanContent,
+        content: readableText,
         mood: currentMoodMeta.label,
         moodScore: currentMoodMeta.score,
         tags,
@@ -251,7 +254,7 @@ export const JournalEditor: React.FC<JournalEditorProps> = ({
         userId,
         "GEMINI_REFLECTION_REQUEST",
         "SUCCESS",
-        `Requested ${selectedPersona} reflection (${cleanContent.length} chars)`,
+        `Requested ${selectedPersona} reflection (${readableText.length} chars)`,
         "GEMINI_GATEWAY"
       );
     } catch (err: any) {
@@ -272,7 +275,7 @@ export const JournalEditor: React.FC<JournalEditorProps> = ({
   // Submit and Save Entry
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!content.trim()) {
+    if (isContentEmpty(content)) {
       alert("Please write your journal thoughts before saving.");
       return;
     }
@@ -280,7 +283,9 @@ export const JournalEditor: React.FC<JournalEditorProps> = ({
     setSaving(true);
     setSavedSuccessMessage(null);
     try {
-      let finalContent = content;
+      // Securely sanitize formatted rich HTML content
+      const cleanContent = sanitizeHtml(content);
+      let finalContent = cleanContent;
       let encryptedPayload: string | undefined = undefined;
 
       if (isEncryptedVault) {
@@ -289,14 +294,14 @@ export const JournalEditor: React.FC<JournalEditorProps> = ({
           setSaving(false);
           return;
         }
-        // Client-side Zero Knowledge AES-GCM encryption
-        encryptedPayload = await encryptText(content, vaultPasskey);
+        // Client-side Zero Knowledge AES-GCM encryption on the formatted content
+        encryptedPayload = await encryptText(cleanContent, vaultPasskey);
         finalContent = "[Encrypted MindVault Zero-Knowledge Content]";
       }
 
       const entryPayload: Omit<JournalEntry, 'id' | 'userId' | 'createdAt' | 'updatedAt'> = {
         title: title.trim() || `Journal • ${new Date().toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}`,
-        content: isEncryptedVault ? finalContent : content.trim(),
+        content: isEncryptedVault ? finalContent : cleanContent,
         mood,
         moodScore: currentMoodMeta.score,
         tags,
@@ -313,7 +318,7 @@ export const JournalEditor: React.FC<JournalEditorProps> = ({
         id: savedId,
         userId,
         ...entryPayload,
-        content: content.trim(), // preserved unencrypted in memory for seamless transition to talk to Gemini
+        content: cleanContent, // preserved unencrypted in memory for seamless transition to talk to Gemini
         createdAt: initialEntry?.createdAt || new Date().toISOString(),
         updatedAt: new Date().toISOString()
       };
@@ -338,9 +343,9 @@ export const JournalEditor: React.FC<JournalEditorProps> = ({
     }
   };
 
-  // Word count & estimate read time
-  const wordCount = content.trim().length === 0 ? 0 : content.trim().split(/\s+/).length;
-  const readTimeMin = Math.ceil(wordCount / 200);
+  // Word count & estimate read time based on readable text
+  const wordCount = calculateWordCount(content);
+  const readTimeMin = Math.max(1, Math.ceil(wordCount / 200));
 
   return (
     <section className="bg-surface-card border border-theme rounded-3xl p-6 md:p-8 shadow-xs relative transition-all">
@@ -443,19 +448,17 @@ export const JournalEditor: React.FC<JournalEditorProps> = ({
           />
         </div>
 
-        {/* Main Content Area */}
+        {/* Main Content Area: Attached Rich-Text Editor */}
         <div className="relative">
-          <textarea
+          <RichTextEditor
             id="journal-content-textarea"
-            rows={7}
             value={content}
-            onChange={(e) => setContent(e.target.value)}
+            onChange={(newHtml) => setContent(newHtml)}
             placeholder="Unpack your raw thoughts, sensations, vulnerabilities, or insights freely. MindVault strictly isolates this to your authenticated UID..."
-            className="w-full bg-surface-secondary border border-theme rounded-2xl p-4 text-theme-primary placeholder-theme-muted font-serif-body text-base leading-relaxed focus:outline-none focus:border-accent transition-all resize-y min-h-[160px]"
           />
 
           {/* Word count footer */}
-          <div className="flex items-center justify-between text-[11px] font-mono text-theme-muted px-2 mt-1.5">
+          <div className="flex items-center justify-between text-[11px] font-mono text-theme-muted px-2 mt-2">
             <span>{wordCount} words • ~{readTimeMin} min read</span>
             {isEncryptedVault && (
               <span className="text-accent flex items-center gap-1 font-medium">
@@ -678,7 +681,7 @@ export const JournalEditor: React.FC<JournalEditorProps> = ({
             <button
               id="journal-reflect-gemini-btn"
               type="button"
-              disabled={isReflecting || !content.trim()}
+              disabled={isReflecting || isContentEmpty(content)}
               onClick={handleGenerateReflection}
               className="flex items-center gap-2 px-4 py-2 rounded-xl bg-surface-card hover:bg-surface-secondary border border-theme hover:border-accent text-theme-primary hover:text-accent text-xs font-semibold shadow-xs transition-all disabled:opacity-40"
             >
@@ -754,7 +757,7 @@ export const JournalEditor: React.FC<JournalEditorProps> = ({
           <button
             id="journal-save-entry-btn"
             type="submit"
-            disabled={saving || uploadingImage || !content.trim()}
+            disabled={saving || uploadingImage || isContentEmpty(content)}
             className="flex items-center gap-2 px-6 py-2.5 rounded-xl btn-primary-accent font-medium text-xs shadow-xs transition-all disabled:opacity-50 cursor-pointer"
           >
             <Save className="w-4 h-4" />

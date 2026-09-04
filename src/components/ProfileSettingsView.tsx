@@ -16,6 +16,7 @@ import {
 import { User } from '../lib/firebase';
 import { JournalEntry, SecurityStatusReport } from '../types';
 import { useTheme } from '../lib/theme';
+import { MindVaultMark } from './MindVaultLogo';
 
 interface ProfileSettingsViewProps {
   currentUser: User | null;
@@ -247,34 +248,41 @@ export const ProfileSettingsView: React.FC<ProfileSettingsViewProps> = ({
         </div>
       </div>
 
-      {/* Discrete Admin Section: ONLY visible if user has verified Admin custom claim */}
+      {/* Discrete Admin Section: ONLY visible if user is designated administrator */}
       {isAdminVerified && (
-        <div className="bg-surface-card border border-indigo-500/30 rounded-3xl p-6 md:p-8 shadow-xs space-y-4">
+        <div className="bg-surface-card border border-theme rounded-3xl p-6 md:p-8 shadow-xs space-y-4">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <ShieldCheck className="w-5 h-5 text-indigo-500" />
-              <h3 className="font-display font-bold text-sm text-theme-primary">
-                Administrative Operations
-              </h3>
+            <div className="flex items-center gap-2.5">
+              <div className="w-8 h-8 rounded-xl bg-accent/15 border border-accent/30 flex items-center justify-center text-accent">
+                <MindVaultMark size={18} className="text-accent" />
+              </div>
+              <div>
+                <h3 className="font-display font-bold text-sm text-theme-primary">
+                  Administrator Profile & Overview
+                </h3>
+                <p className="text-xs text-theme-muted font-serif-body">
+                  MindVault Operator Account
+                </p>
+              </div>
             </div>
-            <span className="text-[10px] font-mono uppercase px-2.5 py-0.5 rounded-full bg-indigo-500/10 text-indigo-500 border border-indigo-500/30">
-              Verified Role: ADMIN
+            <span className="text-[10px] font-mono uppercase px-2.5 py-0.5 rounded-full bg-accent/15 text-accent border border-accent/30 font-semibold">
+              Administrator
             </span>
           </div>
 
-          <p className="text-xs text-theme-muted leading-relaxed">
-            Your Firebase account possesses verified administrative claims. You have access to server-side aggregate telemetry without raw user data access.
+          <p className="text-xs text-theme-secondary leading-relaxed font-serif-body">
+            You are signed in with the designated administrator account (barathsuresh19@gmail.com). You can view the system overview and aggregate operational telemetry.
           </p>
 
           <div>
             <button
               id="profile-open-admin-dashboard-btn"
               onClick={onOpenAdminDashboard}
-              className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-xs shadow-xs transition-colors"
+              className="flex items-center gap-2 px-4 py-2 rounded-xl bg-surface-secondary hover:bg-surface-card border border-theme hover:border-accent/40 text-theme-primary hover:text-accent font-medium text-xs shadow-xs transition-colors cursor-pointer"
             >
-              <ShieldCheck className="w-4 h-4" />
-              <span>Open Aggregate Admin Dashboard</span>
-              <ExternalLink className="w-3 h-3" />
+              <ShieldCheck className="w-3.5 h-3.5 text-accent" />
+              <span>Open Admin Profile & Overview</span>
+              <ExternalLink className="w-3 h-3 text-theme-muted" />
             </button>
           </div>
         </div>

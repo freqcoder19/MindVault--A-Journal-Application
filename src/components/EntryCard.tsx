@@ -17,6 +17,7 @@ import { decryptText } from '../lib/security';
 import { AIReflectionCard } from './AIReflectionCard';
 import { updateJournalEntry } from '../lib/journalService';
 import { ImagePreviewModal } from './ImagePreviewModal';
+import { renderRichTextHtml, extractPlainText } from '../lib/richText';
 
 interface EntryCardProps {
   entry: JournalEntry;
@@ -187,11 +188,23 @@ export const EntryCard: React.FC<EntryCardProps> = ({
           </div>
         ) : (
           <div className="text-theme-secondary text-sm md:text-base leading-relaxed font-serif-body">
-            <p className={`${isExpanded ? '' : 'line-clamp-3'} whitespace-pre-line`}>
-              {displayContent || (decryptError ? "⚠️ Error decrypting entry. Check your passkey." : entry.content)}
-            </p>
+            {decryptError ? (
+              <p className="text-rose-500 text-xs">⚠️ Error decrypting entry. Check your passkey.</p>
+            ) : (
+              <div
+                className={`rich-text-content ${isExpanded ? '' : 'line-clamp-4'} 
+                           [&_ul]:list-disc [&_ul]:ml-6 [&_ul]:my-1.5 
+                           [&_ol]:list-decimal [&_ol]:ml-6 [&_ol]:my-1.5 
+                           [&_li]:my-0.5 
+                           [&_b]:font-bold [&_strong]:font-bold 
+                           [&_i]:italic [&_em]:italic 
+                           [&_u]:underline
+                           [&_p]:my-1`}
+                dangerouslySetInnerHTML={{ __html: renderRichTextHtml(displayContent || entry.content) }}
+              />
+            )}
             
-            {(displayContent?.length || 0) > 200 && (
+            {extractPlainText(displayContent || entry.content).length > 200 && (
               <button
                 id={`entry-expand-btn-${entry.id}`}
                 onClick={() => setIsExpanded(!isExpanded)}
@@ -294,7 +307,7 @@ export const EntryCard: React.FC<EntryCardProps> = ({
               <div className="mt-2">
                 <AIReflectionCard
                   reflection={entry.aiReflection}
-                  entryContent={displayContent || entry.content}
+                  entryContent={extractPlainText(displayContent || entry.content)}
                   onSelectInquiryQuestion={onSelectInquiryQuestion}
                   savedChatHistory={entry.aiChatHistory || []}
                   onSaveChatHistory={handleSaveChat}

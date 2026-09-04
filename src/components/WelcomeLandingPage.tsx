@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import { 
-  Shield, 
   Lock, 
   Sparkles, 
   BookOpen, 
@@ -14,6 +13,7 @@ import {
   HeartHandshake,
   Key
 } from 'lucide-react';
+import { MindVaultMark } from './MindVaultLogo';
 
 interface WelcomeLandingPageProps {
   onOpenAuth: () => void;
@@ -88,7 +88,7 @@ export const WelcomeLandingPage: React.FC<WelcomeLandingPageProps> = ({ onOpenAu
           {/* Logo */}
           <div className="flex items-center gap-2.5 group cursor-default">
             <div className="w-8 h-8 rounded-xl bg-[#12191d] border border-[#233139] flex items-center justify-center text-[#48ab9e] shadow-[0_0_15px_rgba(72,171,158,0.15)] group-hover:border-[#48ab9e]/40 transition-all">
-              <Shield className="w-4 h-4" />
+              <MindVaultMark className="w-4 h-4 text-[#48ab9e]" />
             </div>
             <div className="flex flex-col">
               <span className="font-display font-bold text-base tracking-wider text-white">
@@ -464,7 +464,7 @@ export const WelcomeLandingPage: React.FC<WelcomeLandingPageProps> = ({ onOpenAu
 
             <div className="flex items-center gap-3 mb-5">
               <div className="w-10 h-10 rounded-2xl bg-[#152127] border border-[#253842] flex items-center justify-center text-[#48ab9e]">
-                <Shield className="w-5 h-5" />
+                <MindVaultMark className="w-5 h-5 text-[#48ab9e]" />
               </div>
               <div>
                 <h3 className="font-display font-bold text-lg text-white">

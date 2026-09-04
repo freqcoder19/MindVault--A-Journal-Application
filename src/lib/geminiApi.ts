@@ -1,5 +1,5 @@
 import { getUserIdToken, getAppCheckToken } from "./firebase";
-import { PersonaType, AIReflectionData, AIChatMessage, DigestReport, IntrospectivePrompt, ThoughtLoopAnalysis, AdminDashboardData } from "../types";
+import { PersonaType, AIReflectionData, AIChatMessage, DigestReport, IntrospectivePrompt, ThoughtLoopAnalysis, AdminDashboardData, MonthlyReflection } from "../types";
 
 export interface ReflectParams {
   content: string;
@@ -282,6 +282,47 @@ export async function fetchAdminTelemetry(): Promise<any> {
   }
 
   return response.json();
+}
+
+// Generate Monthly Reflection via secure Gemini backend (/api/monthly-reflection)
+export async function generateMonthlyReflection(
+  entries: any[],
+  monthKey: string
+): Promise<{ reflection: MonthlyReflection | null; message?: string; entryCount: number }> {
+  const token = await getUserIdToken();
+  if (!token) {
+    throw new Error("Authentication required: Please sign in to reflect on this month.");
+  }
+
+  const headers = await buildSecureHeaders(true);
+  const response = await fetch("/api/monthly-reflection", {
+    method: "POST",
+    headers,
+    body: JSON.stringify({
+      month: monthKey,
+      entries: entries.map((e) => ({
+        id: e.id,
+        createdAt: e.createdAt,
+        title: e.title,
+        mood: e.mood,
+        moodScore: e.moodScore,
+        tags: e.tags,
+        content: e.content,
+      })),
+    }),
+  });
+
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({ error: "Network error" }));
+    throw new Error(err.error || `Failed to generate monthly reflection (${response.status})`);
+  }
+
+  const data = await response.json();
+  return {
+    reflection: data.reflection || null,
+    message: data.message,
+    entryCount: data.entryCount || 0,
+  };
 }
 
 

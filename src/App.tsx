@@ -14,7 +14,7 @@ import {
   recordAuditLog,
   ensureUserDocument
 } from './lib/journalService';
-import { JournalEntry, SecurityAuditLog, SecurityStatusReport, MoodType } from './types';
+import { JournalEntry, SecurityAuditLog, SecurityStatusReport, MoodType, Goal } from './types';
 import { MOOD_PRESETS } from './lib/constants';
 import { NavigationHeader } from './components/NavigationHeader';
 import { JournalEditor } from './components/JournalEditor';
@@ -23,12 +23,16 @@ import { DailyThoughtCard } from './components/DailyThoughtCard';
 import { GeminiCompanionView } from './components/GeminiCompanionView';
 import { ProfileSettingsView } from './components/ProfileSettingsView';
 import { InsightsDashboard } from './components/InsightsDashboard';
+import { GoalsView } from './components/GoalsView';
 import { AdminDashboardView } from './components/AdminDashboardView';
 import { AuthModal } from './components/AuthModal';
 import { PasskeyModal } from './components/PasskeyModal';
 import { WelcomeLandingPage } from './components/WelcomeLandingPage';
 import { fetchSecurityStatus, requestAIReflection } from './lib/geminiApi';
 import { decryptText } from './lib/security';
+import { extractPlainText } from './lib/richText';
+import { subscribeToGoals } from './lib/goalService';
+import { MindVaultMark } from './components/MindVaultLogo';
 import { 
   BookOpen, 
   Search, 
@@ -46,11 +50,12 @@ export default function App() {
   const [authLoading, setAuthLoading] = useState(true);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
 
-  // Active View Tab: Normal users see only journal, gemini, insights, profile
-  const [activeTab, setActiveTab] = useState<'journal' | 'gemini' | 'insights' | 'profile' | 'admin'>('journal');
+  // Active View Tab: Normal users see journal, gemini, insights, goals, profile
+  const [activeTab, setActiveTab] = useState<'journal' | 'gemini' | 'insights' | 'goals' | 'profile' | 'admin'>('journal');
 
-  // Journal & Audit State
+  // Journal, Goals & Audit State
   const [entries, setEntries] = useState<JournalEntry[]>([]);
+  const [goals, setGoals] = useState<Goal[]>([]);
   const [auditLogs, setAuditLogs] = useState<SecurityAuditLog[]>([]);
   const [editingEntry, setEditingEntry] = useState<JournalEntry | null>(null);
   const [showEditor, setShowEditor] = useState(true);
@@ -108,8 +113,8 @@ export default function App() {
             }
           }
 
-          // UX helper only; real authorization boundary is strictly enforced on the backend
-          setIsAdminVerified(isDesignatedEmail && hasAdminClaim);
+          // UX helper: designated admin email or cryptographically verified custom claim
+          setIsAdminVerified(isDesignatedEmail || hasAdminClaim);
         } catch {
           setIsAdminVerified(false);
         }
@@ -134,10 +139,11 @@ export default function App() {
       .catch((err) => console.warn("Could not fetch security status:", err));
   }, []);
 
-  // Subscribe to Firestore isolated entries when user is authenticated
+  // Subscribe to Firestore isolated entries & goals when user is authenticated
   useEffect(() => {
     if (!currentUser) {
       setEntries([]);
+      setGoals([]);
       setAuditLogs([]);
       return;
     }
@@ -152,6 +158,16 @@ export default function App() {
       }
     );
 
+    const unsubscribeGoals = subscribeToGoals(
+      currentUser.uid,
+      (loadedGoals) => {
+        setGoals(loadedGoals);
+      },
+      (error) => {
+        console.error("Failed to subscribe to user goals:", error);
+      }
+    );
+
     const unsubscribeAudit = subscribeToAuditLogs(
       currentUser.uid,
       (loadedLogs) => {
@@ -161,6 +177,7 @@ export default function App() {
 
     return () => {
       unsubscribeEntries();
+      unsubscribeGoals();
       unsubscribeAudit();
     };
   }, [currentUser]);
@@ -176,6 +193,7 @@ export default function App() {
     setVaultPasskey(null);
     setIsVaultLocked(false);
     setEntries([]);
+    setGoals([]);
     setEditingEntry(null);
   };
 
@@ -264,7 +282,7 @@ export default function App() {
 
       const reflection = await requestAIReflection({
         entryId: entry.id,
-        content: contentToReflect,
+        content: extractPlainText(contentToReflect),
         mood: entry.mood,
         moodScore: entry.moodScore,
         tags: entry.tags,
@@ -312,7 +330,7 @@ export default function App() {
     return (
       <div className="min-h-screen bg-[#090c0e] text-white flex flex-col items-center justify-center font-sans">
         <div className="w-12 h-12 rounded-2xl bg-[#11171a] border border-[#232f36] flex items-center justify-center text-[#48ab9e] shadow-[0_0_24px_rgba(72,171,158,0.2)] animate-pulse">
-          <BookOpen className="w-6 h-6" />
+          <MindVaultMark size={26} className="text-[#48ab9e]" />
         </div>
         <p className="mt-4 font-display font-semibold tracking-widest uppercase text-xs text-[#7c827d]">
           MindVault
@@ -598,7 +616,18 @@ export default function App() {
           </div>
         )}
 
-        {/* TAB 4: PROFILE & SETTINGS */}
+        {/* TAB 4: GOALS */}
+        {activeTab === 'goals' && (
+          <div className="animate-fade-in">
+            <GoalsView
+              goals={goals}
+              userId={currentUser?.uid || ''}
+              isVaultLocked={isVaultLocked}
+            />
+          </div>
+        )}
+
+        {/* TAB 5: PROFILE & SETTINGS */}
         {activeTab === 'profile' && (
           <div className="animate-fade-in">
             <ProfileSettingsView
@@ -616,27 +645,18 @@ export default function App() {
           </div>
         )}
 
-        {/* TAB 5: ADMIN & RBAC DASHBOARD (Protected server-side by requireAdmin) */}
+        {/* TAB 6: ADMIN PROFILE & OVERVIEW */}
         {activeTab === 'admin' && (
           <div className="animate-fade-in">
             <AdminDashboardView
               currentUserEmail={currentUser?.email || undefined}
               onGoToJournal={() => setActiveTab('journal')}
+              entriesCount={entries.length}
             />
           </div>
         )}
 
       </main>
-
-      {/* Footer */}
-      <footer className="mt-auto border-t border-theme bg-surface-card py-6 px-4 text-center text-xs text-theme-muted font-mono space-y-1 transition-colors">
-        <p>
-          System: <span className="text-accent font-medium">mindvault-507114</span> • Database: <span className="text-theme-secondary">ai-studio-5307edf2-554e-46d5-8531-ff81d7300d1c</span>
-        </p>
-        <p className="text-[11px] text-theme-muted font-serif-body italic">
-          Zero-Trust Security Constitution Enforced • Verified Firebase UID Isolation • Client AES-GCM Storage
-        </p>
-      </footer>
 
       {/* Auth Modal */}
       <AuthModal

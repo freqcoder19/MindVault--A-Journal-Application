@@ -48,6 +48,11 @@ service cloud.firestore {
         allow read, write: if isOwner(userId);
       }
 
+      // Goals subcollection: /users/{userId}/goals/{goalId}
+      match /goals/{goalId} {
+        allow read, write: if isOwner(userId);
+      }
+
       // Recursive wildcard: Protects all existing and future nested subcollections under /users/{userId}
       match /{allSubcollections=**} {
         allow read, write: if isOwner(userId);

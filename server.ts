@@ -1204,6 +1204,125 @@ Generate a structured JSON digest:
 app.post("/api/digest", requireAppCheck, requireAuth, geminiRateLimiter, handleAIDigest);
 app.post("/api/gemini/digest", requireAppCheck, requireAuth, geminiRateLimiter, handleAIDigest);
 
+// Gemini Monthly Reflection (/api/monthly-reflection and /api/gemini/monthly-reflection)
+const handleAIMonthlyReflection = async (req: AuthenticatedRequest, res: express.Response) => {
+  try {
+    operationalMetrics.totalAIRequests++;
+    const uid = req.user!.uid;
+    const { month, entries } = req.body;
+
+    const monthKey = typeof month === "string" && /^\d{4}-\d{2}$/.test(month)
+      ? month
+      : new Date().toISOString().slice(0, 7);
+
+    const [yearStr, monthStr] = monthKey.split("-");
+    const dateObj = new Date(parseInt(yearStr, 10), parseInt(monthStr, 10) - 1, 1);
+    const monthLabel = dateObj.toLocaleDateString("en-US", { month: "long", year: "numeric" });
+
+    // Filter provided authenticated entries for this month
+    let targetEntries: any[] = [];
+    if (Array.isArray(entries)) {
+      targetEntries = entries.filter((e: any) => {
+        const d = typeof e.createdAt === "string" ? e.createdAt : "";
+        return d.startsWith(monthKey);
+      });
+    }
+
+    // Fallback: If not provided or empty, query from Firestore strictly under /users/{uid}/entries
+    if (targetEntries.length === 0) {
+      try {
+        const startOfMonth = `${monthKey}-01T00:00:00.000Z`;
+        const endOfMonth = `${monthKey}-31T23:59:59.999Z`;
+        const snap = await adminDb.collection("users").doc(uid).collection("entries")
+          .where("createdAt", ">=", startOfMonth)
+          .where("createdAt", "<=", endOfMonth)
+          .limit(30)
+          .get();
+        if (!snap.empty) {
+          targetEntries = snap.docs.map((doc) => doc.data());
+        }
+      } catch (err) {
+        console.log("[MonthlyReflection] Query note:", err);
+      }
+    }
+
+    if (targetEntries.length === 0) {
+      return res.json({
+        success: true,
+        uid,
+        reflection: null,
+        entryCount: 0,
+        monthKey,
+        monthLabel,
+        message: "No journal entries found for this month. Write down a few thoughts in your journal to reflect on this month.",
+      });
+    }
+
+    const sanitizedEntries = targetEntries.slice(0, 25).map((e: any, idx: number) => ({
+      entryIndex: idx + 1,
+      date: typeof e.createdAt === "string" ? e.createdAt.slice(0, 10) : "",
+      title: typeof e.title === "string" ? e.title.slice(0, 100) : "Untitled",
+      mood: typeof e.mood === "string" ? e.mood.slice(0, 50) : "Neutral",
+      tags: Array.isArray(e.tags) ? e.tags.slice(0, 5) : [],
+      content: typeof e.content === "string" ? e.content.slice(0, 600) : "",
+    }));
+
+    const { client: ai } = await getAuthenticatedGenAI();
+
+    const systemInstruction = `${BASE_SECURITY_SYSTEM_INSTRUCTION}
+You are a thoughtful, empathetic personal reflection companion in MindVault.
+The user is reviewing their journal entries for the month of ${monthLabel}.
+Analyze ONLY the provided private journal entries for this month. Do NOT invent events, feelings, or accomplishments not grounded in their entries.
+Speak in a warm, personal, and supportive tone. Do NOT diagnose the user or make clinical or psychiatric claims.
+Return a valid JSON object matching this schema:
+{
+  "monthInASentence": "A concise 1-sentence reflection capturing the essence of their month.",
+  "positiveMoments": ["1-3 meaningful positive moments, progress, or accomplishments from their entries"],
+  "challengesAndDowns": ["1-3 gentle summaries of difficulties, worries, setbacks, or unresolved areas in neutral, supportive language"],
+  "whatYouLearned": ["1-3 useful lessons, realizations, or shifts in perspective grounded in their actual entries"],
+  "carryingForward": "ONE concise reflection or thoughtful question to carry into the coming month."
+}`;
+
+    const response = await ai.models.generateContent({
+      model: GEMINI_MODEL,
+      contents: `Monthly entries for ${monthLabel}:\n${JSON.stringify(sanitizedEntries, null, 2)}`,
+      config: {
+        systemInstruction,
+        responseMimeType: "application/json",
+        temperature: 0.5,
+      },
+    });
+
+    const parsed = JSON.parse(response.text || "{}");
+    const reflection = {
+      monthKey,
+      monthLabel,
+      monthInASentence: parsed.monthInASentence || `A meaningful month of reflection and personal growth during ${monthLabel}.`,
+      positiveMoments: Array.isArray(parsed.positiveMoments) ? parsed.positiveMoments : [],
+      challengesAndDowns: Array.isArray(parsed.challengesAndDowns) ? parsed.challengesAndDowns : [],
+      whatYouLearned: Array.isArray(parsed.whatYouLearned) ? parsed.whatYouLearned : [],
+      carryingForward: parsed.carryingForward || "Carry what you learned forward with patience and gentle curiosity.",
+      generatedAt: new Date().toISOString(),
+      entryCount: sanitizedEntries.length,
+    };
+
+    res.json({
+      success: true,
+      uid,
+      reflection,
+      entryCount: sanitizedEntries.length,
+      monthKey,
+      monthLabel,
+    });
+  } catch (err: any) {
+    console.error("[Security] Gemini monthly reflection error:", err);
+    res.status(500).json({ error: "Failed to generate monthly reflection securely." });
+  }
+};
+
+app.post("/api/monthly-reflection", requireAppCheck, requireAuth, geminiRateLimiter, handleAIMonthlyReflection);
+app.post("/api/gemini/monthly-reflection", requireAppCheck, requireAuth, geminiRateLimiter, handleAIMonthlyReflection);
+
 // Gemini Guided Prompt Generator (/api/prompts and /api/gemini/prompts)
 const handleAIPrompts = async (req: AuthenticatedRequest, res: express.Response) => {
   try {

@@ -1,12 +1,10 @@
 import React, { useState } from 'react';
 import { 
   X, 
-  ShieldCheck, 
   Mail, 
   Lock, 
   AlertCircle, 
-  ArrowRight,
-  KeyRound
+  ArrowRight
 } from 'lucide-react';
 import { 
   auth, 
@@ -16,6 +14,7 @@ import {
   createUserWithEmailAndPassword 
 } from '../lib/firebase';
 import { recordAuditLog } from '../lib/journalService';
+import { MindVaultMark } from './MindVaultLogo';
 
 interface AuthModalProps {
   isOpen: boolean;
@@ -104,7 +103,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess
         {/* Header */}
         <div className="text-center mb-6">
           <div className="w-12 h-12 mx-auto mb-3 rounded-2xl bg-[#171e22] border border-[#2d3942] flex items-center justify-center text-[#48ab9e] shadow-xs">
-            <KeyRound className="w-6 h-6" />
+            <MindVaultMark className="w-6 h-6 text-[#48ab9e]" />
           </div>
           <h2 className="font-display font-bold text-xl text-white tracking-wide">
             {isRegister ? 'Create Secure Vault' : 'Sign In to MindVault'}
@@ -222,7 +221,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess
         {/* Footer Security Note */}
         <div className="mt-5 pt-4 border-t border-[#232d34] flex items-center justify-between">
           <div className="flex items-center gap-1.5 text-emerald-400 text-xs font-mono">
-            <ShieldCheck className="w-3.5 h-3.5" />
+            <MindVaultMark size={14} className="text-emerald-400" />
             <span>Encrypted & Isolated</span>
           </div>
 

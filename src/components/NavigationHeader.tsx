@@ -3,6 +3,7 @@ import {
   BookOpen, 
   Sparkles, 
   TrendingUp, 
+  Target,
   Settings,
   ShieldCheck,
   User as UserIcon,
@@ -12,11 +13,12 @@ import {
 import { User } from '../lib/firebase';
 import { SecurityStatusReport } from '../types';
 import { useTheme } from '../lib/theme';
+import { MindVaultMark } from './MindVaultLogo';
 
 interface NavigationHeaderProps {
   currentUser: User | null;
-  activeTab: 'journal' | 'gemini' | 'insights' | 'profile' | 'admin';
-  onTabChange: (tab: 'journal' | 'gemini' | 'insights' | 'profile' | 'admin') => void;
+  activeTab: 'journal' | 'gemini' | 'insights' | 'goals' | 'profile' | 'admin';
+  onTabChange: (tab: 'journal' | 'gemini' | 'insights' | 'goals' | 'profile' | 'admin') => void;
   onOpenAuth: () => void;
   onSignOut: () => void;
   isVaultLocked?: boolean;
@@ -51,9 +53,7 @@ export const NavigationHeader: React.FC<NavigationHeaderProps> = ({
             className="flex items-center gap-3 cursor-pointer select-none"
           >
             <div className="w-9 h-9 rounded-xl bg-surface-secondary border border-theme flex items-center justify-center shadow-xs">
-              <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" className="text-accent" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
-              </svg>
+              <MindVaultMark size={20} className="text-accent" />
             </div>
             <div>
               <div className="flex items-center gap-2">
@@ -105,7 +105,7 @@ export const NavigationHeader: React.FC<NavigationHeaderProps> = ({
           </div>
         </div>
 
-        {/* Normal User Navigation: Exactly 4 Items (Journal, Gemini, Insights, Profile) */}
+        {/* Normal User Navigation: Exactly 5 Items (Journal, Gemini, Summary, Goals, Profile) */}
         <nav className="flex items-center gap-1.5 p-1 bg-surface-secondary border border-theme rounded-2xl overflow-x-auto max-w-full">
           <button
             id="nav-tab-journal"
@@ -147,6 +147,19 @@ export const NavigationHeader: React.FC<NavigationHeaderProps> = ({
           </button>
 
           <button
+            id="nav-tab-goals"
+            onClick={() => onTabChange('goals')}
+            className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-medium transition-all whitespace-nowrap ${
+              activeTab === 'goals'
+                ? 'bg-surface-card text-theme-primary border border-theme shadow-xs font-semibold'
+                : 'text-theme-muted hover:text-theme-primary hover:bg-surface-card/50'
+            }`}
+          >
+            <Target className="w-3.5 h-3.5 text-accent" />
+            <span>Goals</span>
+          </button>
+
+          <button
             id="nav-tab-profile"
             onClick={() => onTabChange('profile')}
             className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-medium transition-all whitespace-nowrap ${
@@ -159,18 +172,18 @@ export const NavigationHeader: React.FC<NavigationHeaderProps> = ({
             <span>Profile</span>
           </button>
 
-          {/* Admin Dashboard: STRICTLY visible only when user is the verified administrator barathsuresh19@gmail.com */}
+          {/* Admin Profile & Overview: Visible for administrator */}
           {isAdminVerified && (
             <button
               id="nav-tab-admin"
               onClick={() => onTabChange('admin')}
               className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-medium transition-all whitespace-nowrap ${
                 activeTab === 'admin'
-                  ? 'bg-purple-950/40 text-purple-300 border border-purple-800/60 shadow-xs font-semibold'
-                  : 'text-purple-400 hover:text-purple-300 hover:bg-purple-950/20'
+                  ? 'bg-surface-card text-theme-primary border border-theme shadow-xs font-semibold'
+                  : 'text-theme-muted hover:text-theme-primary hover:bg-surface-card/50'
               }`}
             >
-              <ShieldCheck className="w-3.5 h-3.5 text-purple-400" />
+              <ShieldCheck className="w-3.5 h-3.5 text-accent" />
               <span>Admin</span>
             </button>
           )}

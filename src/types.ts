@@ -220,3 +220,28 @@ export interface AdminDashboardData {
   securityPosture: AdminSecurityPosture;
   generatedAt: string;
 }
+
+export interface Goal {
+  id: string;
+  userId: string;
+  title: string;
+  description?: string;
+  targetDate?: string; // YYYY-MM-DD
+  status: 'active' | 'completed';
+  createdAt: string;
+  updatedAt: string;
+  completedAt?: string | null;
+}
+
+export interface MonthlyReflection {
+  monthKey: string; // e.g. '2026-09'
+  monthLabel: string; // e.g. 'September 2026'
+  monthInASentence: string;
+  positiveMoments: string[];
+  challengesAndDowns: string[];
+  whatYouLearned: string[];
+  carryingForward: string;
+  generatedAt: string;
+  entryCount: number;
+}
+
