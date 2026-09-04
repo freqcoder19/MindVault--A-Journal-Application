@@ -263,16 +263,16 @@ The backend derives authorization from the verified Firebase identity rather tha
              ┌────────────┐                  ┌──────────────┐
              │ Firestore  │                  │  Vertex AI   │
              │            │                  │ Gemini 2.5   │
-             │ UID-Isolated│                 │    Flash     │
-             │ User Data  │                  │ ADC + IAM    │
-             └────────────┘                  └──────────────┘
+             │ UID-Isolated│                 │    Flash     │ - - - - - - -  |
+             │ User Data  │                  │ ADC + IAM  or secret manager  │
+             └────────────┘                  └──────────────┘ - - - - - - - - -
                     │
                     ▼
              ┌────────────┐
              │  Storage   │
              │  Private   │
              │  Memories  │
-
+              - - - - - - 
 
 
 
