@@ -18,43 +18,6 @@ The core experience follows:
 Every protected operation is tied to the authenticated Firebase UID, creating a strict boundary between users and their personal data.
 
 ---
-
-## 🏛️ System Architecture
-
-```text
-                         ┌─────────────────────┐
-                         │       MindVault     │
-                         │  React + TypeScript │
-                         └──────────┬──────────┘
-                                    │
-                         Firebase Authentication
-                                    │
-                                    ▼
-                         ┌─────────────────────┐
-                         │      Cloud Run      │
-                         │  Node.js + Express  │
-                         ├─────────────────────┤
-                         │ ID Token Verification
-                         │ UID Authorization   │
-                         │ Input Validation    │
-                         │ Rate Limiting       │
-                         └──────┬──────┬───────┘
-                                │      │
-                    ┌───────────┘      └────────────┐
-                    ▼                               ▼
-             ┌────────────┐                  ┌──────────────┐
-             │ Firestore  │                  │  Vertex AI   │
-             │            │                  │ Gemini 2.5   │
-             │ UID-Isolated│                 │    Flash     │
-             │ User Data  │                  │ ADC + IAM    │
-             └────────────┘                  └──────────────┘
-                    │
-                    ▼
-             ┌────────────┐
-             │  Storage   │
-             │  Private   │
-             │  Memories  │
-             └────────────┘
 🌟 Key Features
 📝 Intelligent Journaling
 Rich-text journal editor
@@ -225,11 +188,42 @@ Wrong User UID    → Denied
 
 The backend derives authorization from the verified Firebase identity rather than browser-supplied identity fields.
 
-👨‍💻 Project
+## 🏛️ System Architecture
 
-MindVault — Personal Gemini Journal
+```text
+                         ┌─────────────────────┐
+                         │       MindVault     │
+                         │  React + TypeScript │
+                         └──────────┬──────────┘
+                                    │
+                         Firebase Authentication
+                                    │
+                                    ▼
+                         ┌─────────────────────┐
+                         │      Cloud Run      │
+                         │  Node.js + Express  │
+                         ├─────────────────────┤
+                         │ ID Token Verification
+                         │ UID Authorization   │
+                         │ Input Validation    │
+                         │ Rate Limiting       │
+                         └──────┬──────┬───────┘
+                                │      │
+                    ┌───────────┘      └────────────┐
+                    ▼                               ▼
+             ┌────────────┐                  ┌──────────────┐
+             │ Firestore  │                  │  Vertex AI   │
+             │            │                  │ Gemini 2.5   │
+             │ UID-Isolated│                 │    Flash     │
+             │ User Data  │                  │ ADC + IAM    │
+             └────────────┘                  └──────────────┘
+                    │
+                    ▼
+             ┌────────────┐
+             │  Storage   │
+             │  Private   │
+             │  Memories  │
 
-Built for the Google Cloud Gen AI Academy APAC Ideathon.
 
-Write your thoughts. Talk with Gemini. Understand your journey.
+
 
