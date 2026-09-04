@@ -14,8 +14,8 @@ dotenv.config();
 
 const app = express();
 const PORT = 3000;
-const CLOUD_PROJECT_ID = "mindvault-507114";
-const FIRESTORE_DATABASE_ID = "ai-studio-5307edf2-554e-46d5-8531-ff81d7300d1c";
+const CLOUD_PROJECT_ID = process.env.GOOGLE_CLOUD_PROJECT || "mindvault-507114";
+const FIRESTORE_DATABASE_ID = process.env.FIRESTORE_DATABASE_ID || "ai-studio-5307edf2-554e-46d5-8531-ff81d7300d1c";
 
 // 1. Initialize Firebase Admin SDK
 if (!getApps().length) {
