@@ -1,203 +1,235 @@
-# MindVault
+# ✨ MindVault — Personal Gemini Journal
 
-**Your thoughts. Your space. Your understanding.**
+> **Privacy-First AI Journaling & Personal Reflection Platform**  
+> Built for the **Google Cloud Gen AI Academy APAC Ideathon**
 
-MindVault is a privacy-first personal AI journal that combines a private journal, a conversational AI companion (Gemini), and long-term reflection tools — while guaranteeing that no one, not even the system administrator, can read your private content.
-
-```
-WRITE → TALK → UNDERSTAND
-```
+[![Google Cloud](https://img.shields.io/badge/Google%20Cloud-4285F4?logo=googlecloud&logoColor=white)](https://cloud.google.com/) [![Cloud Run](https://img.shields.io/badge/Cloud%20Run-4285F4?logo=googlecloud&logoColor=white)](https://cloud.google.com/run) [![Gemini](https://img.shields.io/badge/Gemini%202.5%20Flash-8E75B2?logo=google&logoColor=white)](https://ai.google.dev/) [![Firebase](https://img.shields.io/badge/Firebase-FFCA28?logo=firebase&logoColor=black)](https://firebase.google.com/) [![Firestore](https://img.shields.io/badge/Firestore-FFCA28?logo=firebase&logoColor=black)](https://firebase.google.com/docs/firestore)
 
 ---
 
-## Table of Contents
+## 📖 Overview
 
-- [Overview](#overview)
-- [The Problem](#the-problem)
-- [Core Experience](#core-experience)
-- [Features](#features)
-- [Privacy & Security Model](#privacy--security-model)
-- [Architecture](#architecture)
-- [Tech Stack](#tech-stack)
-- [Navigation](#navigation)
-- [Design Philosophy](#design-philosophy)
-- [Cost / AI Usage Principles](#cost--ai-usage-principles)
-- [What This Project Is Not](#what-this-project-is-not)
-- [Roadmap Discipline](#roadmap-discipline)
-- [License](#license)
+**MindVault** is a privacy-first personal AI journal that connects private journaling with **Gemini-powered conversations, reflections, recurring themes, monthly insights, memories, and personal goals**.
+
+The core experience follows:
+
+**Write → Talk → Understand**
+
+Every protected operation is tied to the authenticated Firebase UID, creating a strict boundary between users and their personal data.
 
 ---
 
-## Overview
+## 🏛️ System Architecture
 
-MindVault is not just another CRUD journal with a chatbot bolted on. It's a private personal space designed around a simple idea: journaling becomes more valuable when it's paired with a conversational AI that understands your context — and when your privacy is never negotiable.
+```text
+                         ┌─────────────────────┐
+                         │       MindVault     │
+                         │  React + TypeScript │
+                         └──────────┬──────────┘
+                                    │
+                         Firebase Authentication
+                                    │
+                                    ▼
+                         ┌─────────────────────┐
+                         │      Cloud Run      │
+                         │  Node.js + Express  │
+                         ├─────────────────────┤
+                         │ ID Token Verification
+                         │ UID Authorization   │
+                         │ Input Validation    │
+                         │ Rate Limiting       │
+                         └──────┬──────┬───────┘
+                                │      │
+                    ┌───────────┘      └────────────┐
+                    ▼                               ▼
+             ┌────────────┐                  ┌──────────────┐
+             │ Firestore  │                  │  Vertex AI   │
+             │            │                  │ Gemini 2.5   │
+             │ UID-Isolated│                 │    Flash     │
+             │ User Data  │                  │ ADC + IAM    │
+             └────────────┘                  └──────────────┘
+                    │
+                    ▼
+             ┌────────────┐
+             │  Storage   │
+             │  Private   │
+             │  Memories  │
+             └────────────┘
+🌟 Key Features
+📝 Intelligent Journaling
+Rich-text journal editor
+Mood and tag tracking
+Private image memories
+User-controlled AI reflections
+🤖 Gemini Conversations
+Multi-turn Gemini chat
+Context-aware journal discussions
+Entry-level AI reflection
+Natural personal guidance
+📊 Personal Understanding
+Mood trends
+Recurring themes
+Monthly reflections
+Positive moments and challenges
+Personal observations and carry-forward insights
+🎯 Personal Goals
+Create, edit and delete goals
+Complete and reopen goals
+Optional target dates
+Gemini can reference relevant goals during conversations
+🔐 Security Architecture
 
-Users can:
+MindVault treats security as an architectural requirement rather than a UI feature.
 
-- Write private journal entries
-- Talk naturally with Gemini
-- Reflect on individual entries
-- Understand how their thoughts and emotions evolve over time
-- Identify recurring themes without a "pattern detector" gimmick
-- Review their month through an AI-generated summary
-- Maintain simple personal goals
-- Receive gentle, context-aware encouragement from Gemini when relevant
-
-The product philosophy is built around a progression:
-
-> "What happened?" → "How did I feel?" → "What keeps showing up?" → "What did I learn?" → "What do I want to do next?"
-
-## The Problem
-
-Traditional digital journals mostly just **store** information. Generic AI chatbots can discuss your thoughts, but they lack a persistent, structured personal context. MindVault combines both:
-
-**Private Journal + Conversational AI + Long-Term Personal Reflection**
-
-The AI is designed to feel like a thoughtful companion to your journal — not a generic chatbot bolted onto an app.
-
-## Core Experience
-
-### Write
-Create private journal entries with mood, tags, and up to 2 private images ("memories"). Any entry can be sent for **"Reflect with Gemini"** — the backend securely retrieves the authenticated user's entry so nothing has to be copy-pasted.
-
-### Talk
-Have a natural, multi-turn conversation with Gemini. There is no separate "AI Reflections" area — you simply talk to Gemini, and it responds using your permitted journal context. Gemini does not force analysis, patterns, or motivational messaging into every reply.
-
-### Understand
-MindVault helps you understand your journal through:
-
-- Individual entry reflections
-- Recurring themes that surface naturally (never as a standalone "Thought Loop" or "Pattern Detector" feature)
-- **Monthly Reflection** — select a month and ask Gemini to reflect on it, producing:
-  1. Your month in a few words
-  2. Positive moments
-  3. Challenges & downs
-  4. What you learned
-  5. Something worth noticing
-  6. Carrying forward
-
-All summaries are grounded strictly in actual journal content — Gemini does not invent events, achievements, emotions, or patterns.
-
-## Features
-
-| Area | Description |
-|---|---|
-| **Journal** | Create, edit, delete, and view private entries. Add mood, tags, and up to 2 private images. |
-| **Gemini Companion** | Multi-turn conversational AI, contextually aware of your journal and goals. |
-| **Summary** | Current snapshot (entries, active days, mood/trend), recurring themes, monthly reflection, and a small private "Memories" collection. |
-| **Goals** | Lightweight personal goals — create, edit, complete, reopen, delete, optional target date. Not a project management tool. |
-| **Profile** | Account and app-level settings. |
-| **Admin Dashboard** | Aggregate, anonymized operational telemetry only — no private content, ever. |
-
-Recurring themes and patterns are surfaced gently inside **Summary** or during **Gemini** conversations (e.g. *"Something worth noticing — you've returned to this topic several times this month"*) — never as a standalone, algorithmic-feeling feature.
-
-## Privacy & Security Model
-
-MindVault's strongest differentiator is **privacy by design**:
-
-> "Even the person operating MindVault cannot read your journal."
-
-### Admin Model
-
-- Exactly **one** designated administrator account, authorized via Firebase Authentication with a server-side custom claim (`admin: true`).
-- No admin signup, no role selector, no client-controlled admin flag, no localStorage/query-param/request-body based authorization.
-- The frontend may hide admin UI from normal users, but **authorization is always enforced server-side.**
-
-### What the Administrator Can See
-
-Aggregate, anonymized operational telemetry only:
-
-- Total users, total journal entries, total Gemini requests
-- Request counts and rate-limit statistics
-- System health, backend error counts, model/service status
-- Aggregate storage metrics and safe performance metrics
-
-### What the Administrator Can Never See
-
-- Journal content or titles
-- Gemini chats, prompts, or responses
-- Private images / memories
-- Goals
-- Monthly summaries
-- Individual sentiment, emotional analysis, or recurring patterns
-- Any other private user information
-
-Admin telemetry endpoints return aggregate data only — the backend never retrieves private data and merely hides it in the UI.
-
-### Zero-Trust Request Flow
-
-```
 Firebase Authentication
-        ↓
+          ↓
 Firebase ID Token
-        ↓
-Backend verifies token
-        ↓
-Verified UID
-        ↓
-User-isolated Firestore / Storage
-        ↓
-Secure Gemini backend
-        ↓
+          ↓
+Server-Side Verification
+          ↓
+Trusted Firebase UID
+          ↓
+UID-Based Authorization
+          ↓
+Firestore / Storage Isolation
+Security Controls
+Firebase ID token verification on the server
+No client-trusted UID authorization
+Firestore UID-based isolation
+Storage UID-based isolation
+Server-side input validation
+Per-user API rate limiting
+No hardcoded credentials
+Google Cloud IAM authorization
+Application Default Credentials for Vertex AI
+🧠 Gemini + Vertex AI
+
+Gemini is accessed through Vertex AI using Google Cloud identity:
+
+Cloud Run
+    │
+    ▼
+Application Default Credentials
+    │
+    ▼
+Google Cloud IAM
+    │
+    ▼
 Vertex AI
-```
+    │
+    ▼
+Gemini 2.5 Flash
 
-- The client never determines its own identity or authorization.
-- The backend derives the UID exclusively from a verified Firebase ID token.
-- Firestore and Firebase Storage are isolated per authenticated user.
-- Private images are never publicly accessible.
-- Rate limiting remains enabled at all times.
+No Gemini API key is hardcoded into the application.
 
-## Architecture
+User journal content is only used for AI operations initiated through the application.
 
-**Google Cloud Project:** `mindvault-507114`
+🗄️ Data Isolation
 
-- **Gemini inference:** Google Cloud Vertex AI, using Application Default Credentials / IAM — currently `gemini-2.5-flash`
-- **Secrets:** Google Cloud Secret Manager (no hardcoded API keys, no browser-side Gemini API key)
-- **Auth:** Firebase Authentication with server-side ID token verification
-- **Data:** Firestore and Firebase Storage, both UID-isolated
+Firestore follows a user-scoped hierarchy:
 
-## Tech Stack
+/users/{uid}/entries/{entryId}
 
-- **Frontend:** Web client (Firebase-integrated),react
-- **Backend:** Server-side token verification and business logic
-- **Database:** Firestore (per-user isolation)
-- **Storage:** Firebase Storage (per-user isolation)
-- **AI:** Gemini via Vertex AI
-- **Secrets:** Google Cloud Secret Manager
-- **Auth:** Firebase Authentication + custom claims
+/users/{uid}/conversations/{conversationId}
 
-## Navigation
+/users/{uid}/conversations/{conversationId}/messages/{messageId}
 
-Unauthenticated users land on a polished welcome page (no guest mode, no anonymous journal, no demo login, no skip-login) introducing **Write / Talk / Understand** with a single primary call to action: **Sign In**.
+/users/{uid}/settings/preferences
 
-Authenticated users see:
+Private memories follow the same principle:
 
-```
-Journal | Gemini | Summary | Goals | Profile
-```
+/users/{uid}/entries/{entryId}/images/{imageId}
 
-There are intentionally **no** separate destinations for "Throughput," "Thought Loop," "Recurring Patterns," "AI Reflections," or "Security Architecture." That functionality is folded naturally into Journal, Gemini, Summary, and Goals.
+This ensures that application data is partitioned around the authenticated user's identity.
 
-## Design Philosophy
+☁️ Google Cloud Stack
+Service	Purpose
+Firebase Authentication	Secure user identity
+Cloud Firestore	Private journal and application data
+Cloud Storage	Private journal memories
+Cloud Run	Production application hosting
+Vertex AI	Gemini inference
+Gemini 2.5 Flash	Conversations and reflections
+Secret Manager	Secure secret management
+IAM + ADC	Cloud authentication and authorization
+🚀 Quickstart
+git clone <YOUR_GITHUB_REPOSITORY_URL>
 
-MindVault should feel like a **premium personal journal** — calm, private, warm, minimal, modern, trustworthy, personal.
+cd MindVault--A-Journal-Application
 
-**Embrace:** warm neutral backgrounds, white/off-white surfaces, deep charcoal dark mode, muted sage/teal accents, subtle borders, rounded cards, elegant typography, generous spacing, soft shadows, restrained animation.
+npm install
 
-**Avoid:** bright orange as a primary color, random multi-color cards, old-style black dashboard cards, excessive analytics, technical security dashboards, unnecessary buttons, feature overload.
+npm run dev
 
-The app should make users feel *"this is my private space,"* not *"I'm using an enterprise monitoring system."*
+Production build:
 
+npm run build
+npm start
+☁️ Cloud Run Deployment
+gcloud run deploy mindvault \
+  --source . \
+  --region asia-southeast1 \
+  --platform managed \
+  --allow-unauthenticated \
+  --service-account=<CLOUD_RUN_SERVICE_ACCOUNT> \
+  --set-env-vars="MINDVAULT_GEMINI_AUTH_MODE=VERTEX_AI_ADC,GOOGLE_CLOUD_LOCATION=global,NODE_ENV=production"
+💡 Original Enhancement
 
+MindVault extends a traditional journal into a continuous personal reflection system:
 
-- Saving a journal entry
-- Uploading an image
-- Creating, completing, reopening, or deleting a goal
-- Opening Summary
-- Opening the application
+Journal Entry
+     ↓
+Gemini Conversation
+     ↓
+AI Reflection
+     ↓
+Recurring Themes
+     ↓
+Monthly Understanding
+     ↓
+Personal Goals & Memories
 
-Gemini runs only on explicit user intent — starting a Gemini conversation, choosing "Reflect with Gemini," or requesting "Reflect on this month." Monthly summaries are cached after generation to avoid redundant calls.
+The system does not automatically invoke Gemini when a journal is saved. AI interaction remains user-controlled.
 
+🛡️ Security-First Development
 
+The project began with Google AI Studio Custom Instructions configured as a security constitution.
+
+The development rules established:
+
+Threat Modeling
+      ↓
+Secure Coding
+      ↓
+Authentication
+      ↓
+Authorization
+      ↓
+Database Isolation
+      ↓
+Secret Management
+      ↓
+Secure AI Integration
+
+These principles were carried into the application's Firebase, Firestore, Cloud Run and Vertex AI implementation.
+
+🧪 Validation
+
+Security boundaries were tested against:
+
+Valid Token       → Authorized
+Missing Token     → 401
+Invalid Token     → 401
+Forged Token      → 401
+Wrong User UID    → Denied
+
+The backend derives authorization from the verified Firebase identity rather than browser-supplied identity fields.
+
+👨‍💻 Project
+
+MindVault — Personal Gemini Journal
+
+Built for the Google Cloud Gen AI Academy APAC Ideathon.
+
+Write your thoughts. Talk with Gemini. Understand your journey.
 
