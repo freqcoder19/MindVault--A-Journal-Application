@@ -65,11 +65,12 @@ Per-user API rate limiting
 No hardcoded credentials
 Google Cloud IAM authorization
 Application Default Credentials for Vertex AI
+
 🧠 Gemini Authentication & Intelligence Architecture
 
 MindVault supports two production-ready server-side Gemini authentication modes configured via `MINDVAULT_GEMINI_AUTH_MODE`:
 
-### Mode 1: `VERTEX_AI_ADC` (Default Production Mode)
+### Mode 1: `VERTEX_AI_ADC` 
 Gemini is accessed directly through Google Cloud Vertex AI using Application Default Credentials (ADC) and IAM:
 
 ```
