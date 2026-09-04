@@ -165,7 +165,7 @@ npm run build
 npm start
 ☁️ Cloud Run Deployment
 
-**Mode 1: Vertex AI ADC (Default Production)**
+**Mode 1: Vertex AI ADC **
 ```bash
 gcloud run deploy mindvault \
   --source . \
