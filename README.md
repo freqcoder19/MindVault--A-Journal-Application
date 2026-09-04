@@ -65,27 +65,61 @@ Per-user API rate limiting
 No hardcoded credentials
 Google Cloud IAM authorization
 Application Default Credentials for Vertex AI
-🧠 Gemini + Vertex AI
+🧠 Gemini Authentication & Intelligence Architecture
 
-Gemini is accessed through Vertex AI using Google Cloud identity:
+MindVault supports two production-ready server-side Gemini authentication modes configured via `MINDVAULT_GEMINI_AUTH_MODE`:
 
+### Mode 1: `VERTEX_AI_ADC` (Default Production Mode)
+Gemini is accessed directly through Google Cloud Vertex AI using Application Default Credentials (ADC) and IAM:
+
+```
 Cloud Run
     │
     ▼
-Application Default Credentials
+Application Default Credentials (ADC)
     │
     ▼
-Google Cloud IAM
+Google Cloud IAM (`roles/aiplatform.user`)
     │
     ▼
 Vertex AI
     │
     ▼
 Gemini 2.5 Flash
+```
 
-No Gemini API key is hardcoded into the application.
+- **Zero-Key Architecture**: No API keys are created, managed, or configured.
+- **Enterprise IAM Identity**: The Cloud Run runtime service account authenticates seamlessly via ADC.
+- **Default Setting**: The application defaults to `MINDVAULT_GEMINI_AUTH_MODE=VERTEX_AI_ADC`.
 
-User journal content is only used for AI operations initiated through the application.
+### Mode 2: `GEMINI_API_KEY_SECRET` (Google Cloud Secret Manager Mode)
+For environments where Gemini Developer API keys are utilized, MindVault retrieves the key securely on the backend from Google Cloud Secret Manager using `@google-cloud/secret-manager`:
+
+```
+Cloud Run
+    │
+    ▼
+Application Default Credentials (ADC)
+    │
+    ▼
+Google Cloud IAM (`roles/secretmanager.secretAccessor`)
+    │
+    ▼
+Secret Manager (`projects/${PROJECT_ID}/secrets/${GEMINI_API_KEY_SECRET}/versions/latest`)
+    │
+    ▼
+Server-Side Memory (Ephemeral, never logged or exposed)
+    │
+    ▼
+Gemini 2.5 Flash
+```
+
+- **Configurable Secret Name**: Configure the secret resource name via `GEMINI_API_KEY_SECRET` (defaults to `GEMINI_API_KEY`).
+- **Least-Privilege Access**: The Cloud Run service account requires only `roles/secretmanager.secretAccessor` on the designated secret.
+- **Zero Client Exposure**: The secret is retrieved strictly on the trusted Express server — **never** committed to GitHub, **never** sent to frontend code or browser responses, and **never** printed to logs.
+- **Safe Fallback**: If the secret is unavailable or permissions are restricted, the backend fails safely with graceful diagnostic logging and can optionally fall back to Vertex AI ADC.
+
+User journal content is only used for AI operations explicitly initiated through the application.
 
 🗄️ Data Isolation
 
@@ -129,6 +163,9 @@ Production build:
 npm run build
 npm start
 ☁️ Cloud Run Deployment
+
+**Mode 1: Vertex AI ADC (Default Production)**
+```bash
 gcloud run deploy mindvault \
   --source . \
   --region asia-southeast1 \
@@ -136,6 +173,18 @@ gcloud run deploy mindvault \
   --allow-unauthenticated \
   --service-account=<CLOUD_RUN_SERVICE_ACCOUNT> \
   --set-env-vars="MINDVAULT_GEMINI_AUTH_MODE=VERTEX_AI_ADC,GOOGLE_CLOUD_LOCATION=global,NODE_ENV=production"
+```
+
+**Mode 2: Secret Manager API Key**
+```bash
+gcloud run deploy mindvault \
+  --source . \
+  --region asia-southeast1 \
+  --platform managed \
+  --allow-unauthenticated \
+  --service-account=<CLOUD_RUN_SERVICE_ACCOUNT> \
+  --set-env-vars="MINDVAULT_GEMINI_AUTH_MODE=GEMINI_API_KEY_SECRET,GEMINI_API_KEY_SECRET=GEMINI_API_KEY,GOOGLE_CLOUD_LOCATION=global,NODE_ENV=production"
+```
 💡 Original Enhancement
 
 MindVault extends a traditional journal into a continuous personal reflection system:

@@ -62,16 +62,32 @@ app.use(express.json({ limit: "2mb" }));
 
 
 // 2. Google Cloud Secret Manager & Vertex AI Dual-Mode Credential Resolution
-export type GeminiAuthMode = "SECRET_MANAGER_API_KEY" | "VERTEX_AI_ADC";
+export type GeminiAuthMode = "GEMINI_API_KEY_SECRET" | "SECRET_MANAGER_API_KEY" | "VERTEX_AI_ADC";
 
 const VERTEX_LOCATION = process.env.GOOGLE_CLOUD_LOCATION || process.env.VERTEX_LOCATION || "global";
 const GEMINI_MODEL = "gemini-2.5-flash";
 
-// Authentication mode configuration (Defaults to VERTEX_AI_ADC as required by GCP policy)
-const CONFIGURED_AUTH_MODE: GeminiAuthMode = (process.env.MINDVAULT_GEMINI_AUTH_MODE as GeminiAuthMode) || "VERTEX_AI_ADC";
+// Authentication mode configuration (Defaults to VERTEX_AI_ADC as required by production policy)
+const rawAuthMode = (process.env.MINDVAULT_GEMINI_AUTH_MODE || "VERTEX_AI_ADC").trim().toUpperCase();
+const CONFIGURED_AUTH_MODE: GeminiAuthMode = 
+  rawAuthMode === "GEMINI_API_KEY_SECRET" || rawAuthMode === "SECRET_MANAGER_API_KEY"
+    ? "GEMINI_API_KEY_SECRET"
+    : "VERTEX_AI_ADC";
+
+// Configurable Secret Name in Google Cloud Secret Manager (default: "GEMINI_API_KEY")
+const CONFIGURED_SECRET_NAME = process.env.GEMINI_API_KEY_SECRET || "GEMINI_API_KEY";
 const ALLOW_ADC_FALLBACK = process.env.ALLOW_ADC_FALLBACK !== "false"; // Default true
 
-// Lazy Secret Manager Client
+function getSecretResourcePath(): string {
+  if (CONFIGURED_SECRET_NAME.startsWith("projects/")) {
+    return CONFIGURED_SECRET_NAME.includes("/versions/")
+      ? CONFIGURED_SECRET_NAME
+      : `${CONFIGURED_SECRET_NAME}/versions/latest`;
+  }
+  return `projects/${CLOUD_PROJECT_ID}/secrets/${CONFIGURED_SECRET_NAME}/versions/latest`;
+}
+
+// Lazy Secret Manager Client using Application Default Credentials (ADC) / Cloud Run Runtime Service Account
 let secretManagerClient: SecretManagerServiceClient | null = null;
 function getSecretManagerClient(): SecretManagerServiceClient {
   if (!secretManagerClient) {
@@ -99,8 +115,13 @@ const secretState: SecretResolutionState = {
 
 /**
  * Server-side Secret Manager resolver.
- * Attempts to resolve `projects/mindvault-507114/secrets/GEMINI_API_KEY/versions/latest`
- * NEVER exposes the secret value to API responses, logs, or status endpoints.
+ * Attempts to resolve `projects/${CLOUD_PROJECT_ID}/secrets/${GEMINI_API_KEY_SECRET}/versions/latest`
+ * using the Cloud Run runtime service account with Application Default Credentials (ADC).
+ * 
+ * SECURITY DIRECTIVES:
+ * - NEVER exposes the secret value to API responses, logs, or status endpoints.
+ * - Minimum required IAM permission: roles/secretmanager.secretAccessor.
+ * - Fails safely if secret is missing, unprovisioned, or permission is denied.
  */
 export async function resolveGeminiSecret(): Promise<string | null> {
   secretState.attempted = true;
@@ -113,16 +134,16 @@ export async function resolveGeminiSecret(): Promise<string | null> {
     return null;
   }
 
-  const secretName = `projects/${CLOUD_PROJECT_ID}/secrets/GEMINI_API_KEY/versions/latest`;
+  const secretResourceName = getSecretResourcePath();
   try {
     const client = getSecretManagerClient();
-    const [version] = await client.accessSecretVersion({ name: secretName });
+    const [version] = await client.accessSecretVersion({ name: secretResourceName });
     const payload = version.payload?.data?.toString();
 
     if (payload && payload.trim().length > 0) {
       secretState.resolvedApiKey = payload.trim();
       secretState.statusMessage = "Secret resolved successfully from Secret Manager";
-      console.log(`[Security] Secret Manager: Successfully retrieved secret version from ${secretName}`);
+      console.log(`[Security] Secret Manager: Successfully retrieved secret version from ${secretResourceName}`);
       return secretState.resolvedApiKey;
     } else {
       secretState.resolvedApiKey = null;
@@ -134,11 +155,11 @@ export async function resolveGeminiSecret(): Promise<string | null> {
     
     // Graceful handling for non-provisioned secret or restricted permission
     if (err.code === 7 || err.code === 5) {
-      secretState.statusMessage = "Secret Manager secret unprovisioned; active auth: Vertex AI ADC";
-      console.log("[Security] Secret Manager secret unprovisioned; active engine: Vertex AI ADC");
+      secretState.statusMessage = "Secret Manager secret unprovisioned or permission denied; active auth: Vertex AI ADC";
+      console.log("[Security] Secret Manager secret unprovisioned or permission denied; active engine: Vertex AI ADC");
     } else {
-      secretState.statusMessage = "Secret Manager deferred; active auth: Vertex AI ADC";
-      console.log("[Security] Secret Manager lookup deferred; active engine: Vertex AI ADC");
+      secretState.statusMessage = "Secret Manager lookup deferred; active auth: Vertex AI ADC";
+      console.log("[Security] Secret Manager lookup error/deferred; active engine: Vertex AI ADC");
     }
     return null;
   }
@@ -152,12 +173,12 @@ let activeAuthModeUsed: "Vertex AI ADC" | "Secret Manager API Key" = "Vertex AI 
 /**
  * Resolves the authenticated GoogleGenAI client according to explicit configuration & availability.
  * Follows strict priority:
- * 1. If configured as SECRET_MANAGER_API_KEY -> Attempt to resolve secret.
- * 2. If valid secret found -> use GoogleGenAI({ apiKey }).
+ * 1. If configured as GEMINI_API_KEY_SECRET (or alias SECRET_MANAGER_API_KEY) -> Retrieve secret via Secret Manager.
+ * 2. If valid secret found -> instantiate GoogleGenAI({ apiKey }).
  * 3. If secret does NOT exist and fallback enabled (or mode is VERTEX_AI_ADC) -> Use GoogleGenAI with Vertex AI ADC.
  */
 export async function getAuthenticatedGenAI(): Promise<{ client: GoogleGenAI; mode: "Vertex AI ADC" | "Secret Manager API Key" }> {
-  if (CONFIGURED_AUTH_MODE === "SECRET_MANAGER_API_KEY") {
+  if (CONFIGURED_AUTH_MODE === "GEMINI_API_KEY_SECRET" || CONFIGURED_AUTH_MODE === "SECRET_MANAGER_API_KEY") {
     const apiKey = await resolveGeminiSecret();
     if (apiKey) {
       if (!secretManagerGenAIClient) {
@@ -168,7 +189,7 @@ export async function getAuthenticatedGenAI(): Promise<{ client: GoogleGenAI; mo
     }
 
     if (!ALLOW_ADC_FALLBACK) {
-      throw new Error("SECRET_MANAGER_API_KEY authentication failed and ADC fallback is disabled.");
+      throw new Error("GEMINI_API_KEY_SECRET authentication failed: secret unavailable and ADC fallback is disabled.");
     }
     console.log("[Security] Secret Manager key unavailable; proceeding with verified Vertex AI ADC engine.");
   }
@@ -539,8 +560,11 @@ app.get("/api/security/status", async (req: AuthenticatedRequest, res) => {
     secretManagerLookupAttempted: secretState.attempted,
     secretManagerDiagnostic: secretState.statusMessage,
     configuredGeminiAuthMode: CONFIGURED_AUTH_MODE,
+    configuredSecretName: CONFIGURED_SECRET_NAME,
     activeGeminiAuth: activeAuthModeUsed,
-    geminiAuthEngine: "Google Cloud Vertex AI (Application Default Credentials / ADC)",
+    geminiAuthEngine: activeAuthModeUsed === "Secret Manager API Key"
+      ? "Google Cloud Secret Manager (Server-Side Gemini API Key)"
+      : "Google Cloud Vertex AI (Application Default Credentials / ADC)",
     selectedModel: GEMINI_MODEL,
     vertexLocation: VERTEX_LOCATION,
     rateLimiterActive: true,
