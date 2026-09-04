@@ -165,18 +165,7 @@ npm run build
 npm start
 ☁️ Cloud Run Deployment
 
-**Mode 1: Vertex AI ADC **
-```bash
-gcloud run deploy mindvault \
-  --source . \
-  --region asia-southeast1 \
-  --platform managed \
-  --allow-unauthenticated \
-  --service-account=<CLOUD_RUN_SERVICE_ACCOUNT> \
-  --set-env-vars="MINDVAULT_GEMINI_AUTH_MODE=VERTEX_AI_ADC,GOOGLE_CLOUD_LOCATION=global,NODE_ENV=production"
-```
-
-**Mode 2: Secret Manager API Key**
+** Secret Manager API Key**
 ```bash
 gcloud run deploy mindvault \
   --source . \
@@ -264,9 +253,9 @@ The backend derives authorization from the verified Firebase identity rather tha
              ┌────────────┐                  ┌──────────────┐
              │ Firestore  │                  │  Vertex AI   │
              │            │                  │ Gemini 2.5   │
-             │ UID-Isolated│                 │    Flash     │ - - - - - - -  |
-             │ User Data  │                  │ ADC + IAM  or secret manager  │
-             └────────────┘                  └──────────────┘ - - - - - - - - -
+             │ UID-Isolated│                 │    Flash     │ 
+             │ User Data  │                  │ secret manager  │
+             └────────────┘                  └──────────────┘ 
                     │
                     ▼
              ┌────────────┐
