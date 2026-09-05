@@ -105,9 +105,6 @@ These directives were carried throughout development to keep security boundaries
 
 MindVault is deployed on Google Cloud Run.
 
-Live Application:
-https://mindvault-824200433696.asia-southeast1.run.app/
-
 Region: asia-southeast1
 
 Service: mindvault
