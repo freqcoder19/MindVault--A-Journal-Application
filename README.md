@@ -376,21 +376,6 @@ MindVault combines personal journaling, conversational AI, memories, goals, and 
 
 
 
-## 🔐 Security Architecture
 
-MindVault treats security as an **architectural requirement**, not simply a UI feature.
-
-```text
-Firebase Authentication
-        ↓
-Firebase ID Token
-        ↓
-Server-Side Verification
-        ↓
-Trusted Firebase UID
-        ↓
-UID-Based Authorization
-        ↓
-Firestore / Storage Isolation
 
 
