@@ -70,7 +70,7 @@ MindVault uses Gemini 2.5 Flash for conversations, reflections, themes, and mont
 
 The current Cloud Run deployment uses:
 
-Cloud Run → Application Default Credentials (ADC) → IAM → Vertex AI → Gemini
+Cloud Run → Secret manager → IAM → Vertex AI → Gemini
 
 The application also supports a Google Cloud Secret Manager-based Gemini API-key authentication mode, where the secret is retrieved server-side and never exposed to the client.
 
