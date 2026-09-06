@@ -103,13 +103,54 @@ These directives were carried throughout development to keep security boundaries
 
 🚀 Deployment
 
-MindVault is deployed on Google Cloud Run.
+MindVault can be deployed as a single full-stack service on Google Cloud Run. The React frontend and Node.js/Express backend are served from the same Cloud Run service.
 
-Region: asia-southeast1
+### 1. Prerequisites
 
-Service: mindvault
+Make sure you have:
 
-Challenge Label: dev-tutorial=cloud-run-ai-challenge
+- A Google Cloud project with billing enabled
+- Google Cloud CLI installed and authenticated
+- Cloud Run API enabled
+- Cloud Build API enabled
+- Firebase Authentication configured
+- Cloud Firestore configured
+- Firebase Storage configured
+
+Set your Google Cloud project:
+
+gcloud config set project YOUR_PROJECT_ID
+
+Authenticate:
+
+gcloud auth login
+gcloud auth application-default login
+2. Clone the Repository
+git clone https://github.com/freqcoder19/MindVault--A-Journal-Application.git
+cd MindVault--A-Journal-Application
+
+Install dependencies:
+
+npm install
+3. Configure Firebase
+
+Create or configure a Firebase project and enable:
+
+Firebase Authentication
+Cloud Firestore
+Firebase Cloud Storage
+
+Use your own Firebase client configuration for local development.
+
+Never commit real credentials or service-account private keys.
+
+4. Enable Required Google Cloud APIs
+gcloud services enable run.googleapis.com \
+  cloudbuild.googleapis.com \
+  aiplatform.googleapis.com \
+  firestore.googleapis.com \
+  secretmanager.googleapis.com
+
 
 🛠️ Technology Stack
 Layer	Technology
@@ -154,6 +195,7 @@ MindVault extends the base Personal Gemini Journal with:
 🎯 Personal goals
 💬 User-controlled Gemini reflections
 🔐 Privacy-first UID isolation
+    Admin Dashboard
 
 These features transform the basic journal into a personal reflection and understanding platform.
 
@@ -173,7 +215,9 @@ Rate limiting
 Production build
 Cloud Run deployment
 Secret Manager configuration
+
 📦 Local Setup
+
 Install
 npm install
 Configure
@@ -205,6 +249,124 @@ real API keys
 private credentials
 
 Example configuration files are provided so developers can configure their own Firebase and Google Cloud projects.
+
+5. Configure Cloud Run Service Account
+
+The Cloud Run runtime service account requires permission to use Vertex AI.
+
+Grant the Vertex AI User role:
+
+gcloud projects add-iam-policy-binding YOUR_PROJECT_ID \
+  --member="serviceAccount:YOUR_RUNTIME_SERVICE_ACCOUNT" \
+  --role="roles/aiplatform.user"
+
+For Secret Manager authentication mode, also grant:
+
+gcloud secrets add-iam-policy-binding GEMINI_API_KEY \
+  --member="serviceAccount:YOUR_RUNTIME_SERVICE_ACCOUNT" \
+  --role="roles/secretmanager.secretAccessor"
+
+  Secret Manager Mode
+
+MindVault also supports securely retrieving a Gemini API key from Google Cloud Secret Manager:
+
+Cloud Run
+    ↓
+IAM
+    ↓
+Google Cloud Secret Manager
+    ↓
+Gemini API Key
+    ↓
+Gemini
+
+Configure:
+
+MINDVAULT_GEMINI_AUTH_MODE=GEMINI_API_KEY_SECRET
+GEMINI_API_KEY_SECRET=GEMINI_API_KEY
+
+The API key is retrieved server-side and is never exposed to the client.
+
+7. Build the Application
+
+Verify the production build:
+
+npm run build
+8. Deploy to Cloud Run
+
+From the project directory:
+
+gcloud run deploy mindvault \
+  --source . \
+  --region=asia-southeast1 \
+  --platform=managed \
+  --allow-unauthenticated \
+  --service-account=YOUR_RUNTIME_SERVICE_ACCOUNT \
+  --set-env-vars=
+
+  9. Verify the Deployment
+
+Check the Cloud Run service:
+
+gcloud run services describe mindvault \
+  --region=asia-southeast1
+
+Get the deployed URL:
+
+gcloud run services describe mindvault \
+  --region=asia-southeast1 \
+  --format="value(status.url)"
+
+Open the returned URL and verify:
+
+Firebase sign-in
+Journal creation
+Gemini conversations
+AI reflections
+Firestore persistence
+Private image uploads
+Goals
+Monthly insights
+10. Google Cloud Gen AI Academy Challenge Label
+
+Apply the required challenge label:
+
+gcloud run services update mindvault \
+  --region=asia-southeast1 \
+  --update-labels=dev-tutorial=cloud-run-ai-challenge
+
+Verify the label:
+
+gcloud run services describe mindvault \
+  --region=asia-southeast1 \
+  --format="value(metadata.labels)"
+
+The output should include:
+
+dev-tutorial=cloud-run-ai-challenge
+11. Firestore and Storage Security Rules
+
+Deploy Firestore rules:
+
+firebase deploy --only firestore:rules
+
+Deploy Storage rules:
+
+firebase deploy --only storage
+
+The rules enforce Firebase UID-based access so users can only access their own private data.
+
+🔒 Security Notes
+
+Never commit:
+
+.env
+.env.local
+service-account*.json
+*.pem
+*.key
+real Gemini API keys
+private credentials
 
 🎯 Project Vision
 
